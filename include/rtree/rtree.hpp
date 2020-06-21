@@ -16,6 +16,11 @@ namespace rtree
     {
     public:
         void insert(BoundingBox b, DataType data);
+
+        /**
+         * Find all entries whose bounding boxes are intersected by b
+         */
+        std::vector<Entry<DataType>> find(BoundingBox b) const;
         void print() const;
 
     private:
@@ -63,6 +68,32 @@ namespace rtree
     }
 
     template<typename DataType>
+    std::vector<Entry<DataType>> Tree<DataType>::find(BoundingBox b) const
+    {
+        std::vector<Entry<DataType>> intersected;
+        std::stack<node_ptr<DataType>> stack { { _root } };
+        while (!stack.empty()) {
+            const auto node = stack.top();
+            stack.pop();
+            if (node->isLeaf()) {
+                for (const auto& entry: node->getEntries()) {
+                    const auto box = entry.box;
+                    if (box.intersects(b)) {
+                        intersected.push_back(entry);
+                    }
+                }
+            }
+            else {
+                const auto& children = node->getChildren();
+                for (const auto& child: node->getChildren()) {
+                    stack.emplace(child);
+                }
+            }
+        }
+        return intersected;
+    }
+
+    template<typename DataType>
     void Tree<DataType>::print() const
     {
         std::cout << "Printing R-tree:\n";
@@ -85,7 +116,8 @@ namespace rtree
                 const auto box = node->getBoundingBox();
                 std::cout << std::string(indent, ' ')
                     << "(" << box.x << ", " << box.y << ", " << box.w << ", " << box.h << ")\n";
-                for (auto it = node->getChildren().rbegin(); it != node->getChildren().rend(); it++) {
+                const auto& children = node->getChildren();
+                for (auto it = children.rbegin(); it != children.rend(); it++) {
                     stack.emplace(indent + 2, *it);
                 }
             }
