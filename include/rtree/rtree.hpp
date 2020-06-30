@@ -1,10 +1,7 @@
 #pragma once
-#include <algorithm>
-#include <iostream>
-#include <memory>
-#include <stack>
-#include <vector>
+#include <stdexcept>
 
+#include "iterator.hpp"
 #include "node.hpp"
 #include "settings.h"
 
@@ -16,7 +13,9 @@ namespace rtree
     {
     public:
         void insert(BoundingBox b, DataType data);
-        void print() const;
+
+        Iterator<DataType> begin() const { return Iterator<DataType>(_root); }
+        Iterator<DataType> end() const { return Iterator<DataType>(); }
 
     private:
         node_ptr<DataType> findInsertCandidate(BoundingBox b) const;
@@ -60,37 +59,6 @@ namespace rtree
             }
             node = parent;
         }
-    }
-
-    template<typename DataType>
-    void Tree<DataType>::print() const
-    {
-        std::cout << "Printing R-tree:\n";
-        std::stack<std::pair<int, node_ptr<DataType>>> stack { { std::make_pair(0, _root) } };
-        while (!stack.empty()) {
-            const auto [indent, node] = stack.top();
-            stack.pop();
-            if (node->isLeaf()) {
-                const auto box = node->getBoundingBox();
-                std::cout << std::string(indent, ' ')
-                    << "(" << box.x << ", " << box.y << ", " << box.w << ", " << box.h << ")\n";
-                for (const auto& entry: node->getEntries()) {
-                    const auto box = entry.box;
-                    std::cout << std::string(indent, ' ')
-                        << ".(" << box.x << ", " << box.y << ", " << box.w << ", " << box.h << ")\n";
-                }
-                std::cout << std::string(10, '-') << '\n';
-            }
-            else {
-                const auto box = node->getBoundingBox();
-                std::cout << std::string(indent, ' ')
-                    << "(" << box.x << ", " << box.y << ", " << box.w << ", " << box.h << ")\n";
-                for (auto it = node->getChildren().rbegin(); it != node->getChildren().rend(); it++) {
-                    stack.emplace(indent + 2, *it);
-                }
-            }
-        }
-        std::cout << std::endl;
     }
 
     template<typename DataType>
