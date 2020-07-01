@@ -1,7 +1,9 @@
 #pragma once
 #include <algorithm>
 #include <iostream>
+#include <map>
 #include <memory>
+#include <optional>
 #include <stack>
 #include <vector>
 
@@ -15,25 +17,39 @@ namespace rtree
     class Tree
     {
     public:
+        void remove(DataType data);
         void insert(BoundingBox b, DataType data);
 
         /**
          * Find all entries whose bounding boxes are intersected by b
          */
-        std::vector<Entry<DataType>> find(BoundingBox b) const;
+        std::vector<Entry<DataType>> findIntersected(BoundingBox b) const;
         void print() const;
 
     private:
         node_ptr<DataType> findInsertCandidate(BoundingBox b) const;
 
-        // std::vector<node_ptr> _nodes; // Do I need this?
+        std::optional<BoundingBox> getFromCache(DataType data) const;
+        void removeFromCache(DataType data);
+        void saveToCache(DataType data, BoundingBox b);
+
         node_ptr<DataType> _root;
+        std::map<DataType, BoundingBox> _cache;
     };
 
 
     template<typename DataType>
+    void Tree<DataType>::remove(DataType data)
+    {
+        const auto cachedBox = getFromCache(data);
+        removeFromCache(data);
+
+    }
+
+    template<typename DataType>
     void Tree<DataType>::insert(BoundingBox b, DataType data)
     {
+        saveToCache(data, b);
         Entry<DataType> e = { .box=b, .data=data };
         if (!_root) {
             _root = Node<DataType>::makeNode(e);
@@ -68,7 +84,7 @@ namespace rtree
     }
 
     template<typename DataType>
-    std::vector<Entry<DataType>> Tree<DataType>::find(BoundingBox b) const
+    std::vector<Entry<DataType>> Tree<DataType>::findIntersected(BoundingBox b) const
     {
         std::vector<Entry<DataType>> intersected;
         std::stack<node_ptr<DataType>> stack { { _root } };
@@ -150,5 +166,28 @@ namespace rtree
             node = bestChild;
         }
         return node;
+    }
+
+
+    template<typename DataType>
+    std::optional<BoundingBox> Tree<DataType>::getFromCache(DataType data) const
+    {
+        const auto it = _cache.find(data);
+        if (it != _cache.end()) {
+            return it->second;
+        }
+        return {};
+    }
+
+    template<typename DataType>
+    void Tree<DataType>::removeFromCache(DataType data)
+    {
+        _cache.erase(data);
+    }
+
+    template<typename DataType>
+    void Tree<DataType>::saveToCache(DataType data, BoundingBox b)
+    {
+        _cache.insert(data, b);
     }
 } // namespace rtree
