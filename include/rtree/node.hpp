@@ -45,6 +45,7 @@ namespace rtree
         split_result split();
         void updateBoundingBox();
 
+        size_t                                 depth() const;
         const BoundingBox&                     getBoundingBox() const { return _boundingBox; }
         const std::vector<node_ptr<DataType>>& getChildren() const { return _children; }
         const std::vector<Entry<DataType>>&    getEntries() const { return _entries; }
@@ -152,6 +153,18 @@ namespace rtree
             }
             _boundingBox = box;
         }
+    }
+
+    template<typename DataType>
+    size_t Node<DataType>::depth() const
+    {
+        size_t d = 0;
+        auto parent = getParent();
+        while (parent) {
+            d++;
+            parent = parent->getParent();
+        }
+        return d;
     }
 
     template<typename DataType>
