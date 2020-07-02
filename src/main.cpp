@@ -28,6 +28,14 @@ int main()
             }
         }
     });
+
+    const auto intersected = tree.find(rtree::BoundingBox{ .x=9, .y=9, .w=2, .h=2 });
+    std::cout << "Found intersected: " << std::endl;
+    for (const auto& entry: intersected) {
+        const auto box = entry.box;
+        std::cout << "(" << box.x << ", " << box.y << ", " << box.w << ", " << box.h << ")\n";
+    }
+    std::cout << std::endl;
     
     return 0;
 }
