@@ -28,6 +28,7 @@ namespace rtree
 
     private:
         node_ptr<DataType> findInsertCandidate(BoundingBox b) const;
+        node_ptr<DataType> findContaining(Entry<DataType> e) const;
 
         std::optional<BoundingBox> getFromCache(DataType data) const;
         void removeFromCache(DataType data);
@@ -44,6 +45,15 @@ namespace rtree
         const auto cachedBox = getFromCache(data);
         removeFromCache(data);
 
+        BoundingBox boxToDelete;
+        if (cachedBox.has_value()) {
+            boxToDelete = cachedBox.value();
+        }
+        else {
+            // TODO: iterate through entries and find
+        }
+
+        const auto overlapped = findOverlappingLeafs(boxToDelete)
     }
 
     template<typename DataType>
@@ -101,8 +111,8 @@ namespace rtree
             }
             else {
                 const auto& children = node->getChildren();
-                for (const auto& child: node->getChildren()) {
-                    stack.emplace(child);
+                for (const auto& child: children) {
+                    stack.emplace(child); // TODO: emplace only if children is intersected
                 }
             }
         }
@@ -168,6 +178,41 @@ namespace rtree
         return node;
     }
 
+    template<typename DataType>
+    node_ptr<DataType> Tree<DataType>::findContaining(Entry<DataType> e) const
+    {
+        if (!_root->getBoundingBox().overlaps(e.box)) {
+            return nullptr;
+        }
+
+        if (_root->isLeaf()) {
+            return std::find(_root->getEntries().begin(), _root->getEntries().end(), e) != _root->getEntries().end() ?
+                _root :
+                nullptr;
+        }
+
+        std::vector<node_ptr<DataType>> overlapped;
+        std::stack<node_ptr<DataType>> stack { { _root } };
+        while (!stack.empty()) {
+            const auto node = stack.top();
+            stack.pop();
+            if (!node->isLeaf()) {
+                const auto& children = node->getChildren();
+                std::for_each(children.begin(), children.end(), [&](const auto& child) {
+                    if (child->getBoundingBox().overlaps(b)) {
+                        if (child->isLeaf()) {
+                            overlapped.push_back(child);
+                        }
+                        else {
+                            stack.emplace(child);
+                        }
+                    }
+                });
+            }
+        }
+        return overlapped;
+    }
+
 
     template<typename DataType>
     std::optional<BoundingBox> Tree<DataType>::getFromCache(DataType data) const
@@ -188,6 +233,6 @@ namespace rtree
     template<typename DataType>
     void Tree<DataType>::saveToCache(DataType data, BoundingBox b)
     {
-        _cache.insert(data, b);
+        _cache.insert(std::make_pair(data, b));
     }
 } // namespace rtree

@@ -15,7 +15,7 @@ int main()
     }
     tree.print();
 
-    const auto intersected = tree.find(rtree::BoundingBox{ .x=9, .y=9, .w=2, .h=2 });
+    const auto intersected = tree.findIntersected(rtree::BoundingBox{ .x=9, .y=9, .w=2, .h=2 });
     std::cout << "Found intersected: " << std::endl;
     for (const auto& entry: intersected) {
         const auto box = entry.box;
