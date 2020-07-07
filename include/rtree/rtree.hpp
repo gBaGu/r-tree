@@ -29,7 +29,15 @@ namespace rtree
         Iterator<DataType> end() const { return Iterator<DataType>(); }
 
     private:
+        void condense(node_ptr<DataType> node);
+        /**
+         * Find node whose bounding box area will be increased as little as possible
+         * after insertion of entry represented by b
+        */
         node_ptr<DataType> findInsertCandidate(BoundingBox b) const;
+        /**
+         * Find node that is containing entry e
+        */
         node_ptr<DataType> findContaining(Entry<DataType> e) const;
 
         std::optional<BoundingBox> getFromCache(DataType data) const;
@@ -47,15 +55,33 @@ namespace rtree
         const auto cachedBox = getFromCache(data);
         removeFromCache(data);
 
-        BoundingBox boxToDelete;
+        // Find and remove entry by its id
+        node_ptr<DataType> node = nullptr;
         if (cachedBox.has_value()) {
-            boxToDelete = cachedBox.value();
+            const auto boxToDelete = cachedBox.value();
+            Entry<DataType> target = { .box=boxToDelete, .data=data };
+            node = findContaining(target);
+            if (!node) {
+                return;
+            }
+            node->remove(target);
         }
         else {
-            // TODO: iterate through entries and find
+            const auto nodeIt = std::find_if(begin(), end(), [&data](auto& node) {
+                if (!node.isLeaf()) {
+                    return false;
+                }
+                return node.remove(data);
+            });
+            if (nodeIt == end()) {
+                return;
+            }
+            node = nodeIt.get();
         }
-
-        const auto overlapped = findOverlappingLeafs(boxToDelete)
+        condense(node);
+        if (_root->getChildren().size() == 1 && !_root->getChildren()[0]->isLeaf()) {
+            _root = _root->getChildren()[0];
+        }
     }
 
     template<typename DataType>
@@ -96,7 +122,7 @@ namespace rtree
     }
 
     template<typename DataType>
-    std::vector<Entry<DataType>> Tree<DataType>::findIntersected(BoundingBox b) const
+    std::vector<Entry<DataType>> Tree<DataType>::find(BoundingBox b) const
     {
         std::vector<Entry<DataType>> intersected;
         std::stack<node_ptr<DataType>> stack { { _root } };
@@ -119,6 +145,30 @@ namespace rtree
             }
         }
         return intersected;
+    }
+
+    template<typename DataType>
+    void Tree<DataType>::condense(node_ptr<DataType> node)
+    {
+        std::vector<node_ptr<DataType>> removed;
+        auto current = node;
+        while (current != _root) {
+            const auto parent = current->getParent();
+            if (current->size() < DefaultMinEntries) {
+                parent->removeChild(current);
+                removed.push_back(current);
+            }
+            else {
+                current->updateBoundingBox();
+                break;
+            }
+            current = parent;
+        }
+        for (const auto& node: removed) {
+            for (const auto& entry: node->getEntries()) {
+                insert(entry.box, entry.data);
+            }
+        }
     }
 
     template<typename DataType>
@@ -156,31 +206,34 @@ namespace rtree
         }
 
         if (_root->isLeaf()) {
-            return std::find(_root->getEntries().begin(), _root->getEntries().end(), e) != _root->getEntries().end() ?
+            return std::find(_root->getEntries().begin(), _root->getEntries().end(), e) != 
+                   _root->getEntries().end() ?
                 _root :
                 nullptr;
         }
 
-        std::vector<node_ptr<DataType>> overlapped;
         std::stack<node_ptr<DataType>> stack { { _root } };
         while (!stack.empty()) {
             const auto node = stack.top();
             stack.pop();
             if (!node->isLeaf()) {
                 const auto& children = node->getChildren();
-                std::for_each(children.begin(), children.end(), [&](const auto& child) {
-                    if (child->getBoundingBox().overlaps(b)) {
-                        if (child->isLeaf()) {
-                            overlapped.push_back(child);
+                for (auto it = children.begin(); it != children.end(); it++) {
+                    if ((*it)->getBoundingBox().overlaps(e.box)) {
+                        if ((*it)->isLeaf()) {
+                            if (std::find((*it)->getEntries().begin(), (*it)->getEntries().end(), e) !=
+                                (*it)->getEntries().end()) {
+                                return (*it);
+                            }
                         }
                         else {
-                            stack.emplace(child);
+                            stack.emplace((*it));
                         }
                     }
-                });
+                }
             }
         }
-        return overlapped;
+        return nullptr;
     }
 
 

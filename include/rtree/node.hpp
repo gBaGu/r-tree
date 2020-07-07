@@ -39,6 +39,8 @@ namespace rtree
 
         void expandBoundingBox(BoundingBox b);
         void insert(const Entry<DataType>& e);
+        bool remove(const Entry<DataType>& e);
+        bool remove(DataType data);
         void insertChild(node_ptr<DataType> node);
         void removeChild(node_ptr<DataType> node);
         void setParent(node_ptr<DataType> node) { _parent = node; }
@@ -51,6 +53,7 @@ namespace rtree
         const std::vector<Entry<DataType>>&    getEntries() const { return _entries; }
         node_ptr<DataType>                     getParent() const { return _parent; }
         bool                                   isLeaf() const { return !_entries.empty(); }
+        size_t                                 size() const { return isLeaf() ? _entries.size() : _children.size(); }
 
     private:
         BoundingBox _boundingBox;
@@ -91,6 +94,37 @@ namespace rtree
             node->expandBoundingBox(e.box);
             node = node->getParent();
         }
+    }
+
+    template<typename DataType>
+    bool Node<DataType>::remove(const Entry<DataType>& e)
+    {
+        const auto toErase = std::remove(_entries.begin(), _entries.end(), e);
+        bool removed = toErase != _entries.end();
+        _entries.erase(toErase, _entries.end());
+        updateBoundingBox();
+        auto node = _parent;
+        while (node) {
+            node->updateBoundingBox();
+            node = node->getParent();
+        }
+        return removed;
+    }
+
+    template<typename DataType>
+    bool Node<DataType>::remove(DataType data)
+    {
+        const auto toErase = std::remove_if(_entries.begin(), _entries.end(),
+            [&data](const auto& entry) { return entry.data == data; });
+        bool removed = toErase != _entries.end();
+        _entries.erase(toErase, _entries.end());
+        updateBoundingBox();
+        auto node = _parent;
+        while (node) {
+            node->updateBoundingBox();
+            node = node->getParent();
+        }
+        return removed;
     }
 
     template<typename DataType>
