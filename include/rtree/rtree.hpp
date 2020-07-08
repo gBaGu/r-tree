@@ -152,6 +152,7 @@ namespace rtree
     {
         std::vector<node_ptr<DataType>> removed;
         auto current = node;
+        // Go all the way up till we find node that doesn`t need to be reinserted
         while (current != _root) {
             const auto parent = current->getParent();
             if (current->size() < DefaultMinEntries) {
@@ -159,7 +160,7 @@ namespace rtree
                 removed.push_back(current);
             }
             else {
-                current->updateBoundingBox();
+                current->updateBoundingBoxes();
                 break;
             }
             current = parent;

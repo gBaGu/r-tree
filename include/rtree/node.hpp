@@ -45,7 +45,7 @@ namespace rtree
         void removeChild(node_ptr<DataType> node);
         void setParent(node_ptr<DataType> node) { _parent = node; }
         split_result split();
-        void updateBoundingBox();
+        void updateBoundingBoxes();
 
         size_t                                 depth() const;
         const BoundingBox&                     getBoundingBox() const { return _boundingBox; }
@@ -63,6 +63,7 @@ namespace rtree
 
         split_result splitInner();
         split_result splitLeaf();
+        void updateBoundingBox();
     };
 
 
@@ -102,12 +103,7 @@ namespace rtree
         const auto toErase = std::remove(_entries.begin(), _entries.end(), e);
         bool removed = toErase != _entries.end();
         _entries.erase(toErase, _entries.end());
-        updateBoundingBox();
-        auto node = _parent;
-        while (node) {
-            node->updateBoundingBox();
-            node = node->getParent();
-        }
+        updateBoundingBoxes();
         return removed;
     }
 
@@ -118,12 +114,7 @@ namespace rtree
             [&data](const auto& entry) { return entry.data == data; });
         bool removed = toErase != _entries.end();
         _entries.erase(toErase, _entries.end());
-        updateBoundingBox();
-        auto node = _parent;
-        while (node) {
-            node->updateBoundingBox();
-            node = node->getParent();
-        }
+        updateBoundingBoxes();
         return removed;
     }
 
@@ -143,12 +134,7 @@ namespace rtree
     void Node<DataType>::removeChild(node_ptr<DataType> n)
     {
         _children.erase(std::remove(_children.begin(), _children.end(), n), _children.end());
-        updateBoundingBox();
-        auto node = _parent;
-        while (node) {
-            node->updateBoundingBox();
-            node = node->getParent();
-        }
+        updateBoundingBoxes();
     }
 
     template<typename DataType>
@@ -167,25 +153,13 @@ namespace rtree
     }
 
     template<typename DataType>
-    void Node<DataType>::updateBoundingBox()
+    void Node<DataType>::updateBoundingBoxes()
     {
-        if (_entries.empty() && _children.empty()) {
-            return;
-        }
-
-        if (isLeaf()) {
-            auto box = _entries.front().box;
-            for (const auto& entry: _entries) {
-                box = box & entry.box;
-            }
-            _boundingBox = box;
-        }
-        else {
-            auto box = _children.front()->getBoundingBox();
-            for (const auto& child: _children) {
-                box = box & child->getBoundingBox();
-            }
-            _boundingBox = box;
+        updateBoundingBox();
+        auto node = _parent;
+        while (node) {
+            node->updateBoundingBox();
+            node = node->getParent();
         }
     }
 
@@ -271,5 +245,28 @@ namespace rtree
             }
         }
         return ret;
+    }
+
+    template<typename DataType>
+    void Node<DataType>::updateBoundingBox()
+    {
+        if (_entries.empty() && _children.empty()) {
+            return;
+        }
+
+        if (isLeaf()) {
+            auto box = _entries.front().box;
+            for (const auto& entry: _entries) {
+                box = box & entry.box;
+            }
+            _boundingBox = box;
+        }
+        else {
+            auto box = _children.front()->getBoundingBox();
+            for (const auto& child: _children) {
+                box = box & child->getBoundingBox();
+            }
+            _boundingBox = box;
+        }
     }
 } // namespace rtree
