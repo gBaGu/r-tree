@@ -84,6 +84,7 @@ namespace rtree
         double area() const { return h * w; } //TODO: rework to be able to work with negative width and height
         double distance(const BoundingBox& other) const;
         bool intersects(const BoundingBox& other) const;
+        bool overlaps(const BoundingBox& other) const;
 
         bool operator==(const BoundingBox& other) const;
         bool operator!=(const BoundingBox& other) const { return !(*this == other); }
@@ -134,6 +135,11 @@ namespace rtree
         const auto interTop = std::min(tr().y, other.tr().y);
         return interLeft <= interRight && 
             interBottom <= interTop;
+    }
+
+    bool BoundingBox::overlaps(const BoundingBox& other) const
+    {
+        return (*this & other) == *this; 
     }
 
     inline bool BoundingBox::operator==(const BoundingBox& other) const

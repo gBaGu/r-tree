@@ -1,5 +1,10 @@
 #pragma once
+#include <algorithm>
+#include <map>
+#include <optional>
+#include <stack>
 #include <stdexcept>
+#include <vector>
 
 #include "iterator.hpp"
 #include "node.hpp"
@@ -12,6 +17,7 @@ namespace rtree
     class Tree
     {
     public:
+        void remove(DataType data);
         void insert(BoundingBox b, DataType data);
 
         /**
@@ -23,16 +29,65 @@ namespace rtree
         Iterator<DataType> end() const { return Iterator<DataType>(); }
 
     private:
+        void condense(node_ptr<DataType> node);
+        /**
+         * Find node whose bounding box area will be increased as little as possible
+         * after insertion of entry represented by b
+        */
         node_ptr<DataType> findInsertCandidate(BoundingBox b) const;
+        /**
+         * Find node that is containing entry e
+        */
+        node_ptr<DataType> findContaining(Entry<DataType> e) const;
 
-        // std::vector<node_ptr> _nodes; // Do I need this?
+        std::optional<BoundingBox> getFromCache(DataType data) const;
+        void removeFromCache(DataType data);
+        void saveToCache(DataType data, BoundingBox b);
+
         node_ptr<DataType> _root;
+        std::map<DataType, BoundingBox> _cache;
     };
 
 
     template<typename DataType>
+    void Tree<DataType>::remove(DataType data)
+    {
+        const auto cachedBox = getFromCache(data);
+        removeFromCache(data);
+
+        // Find and remove entry by its id
+        node_ptr<DataType> node = nullptr;
+        if (cachedBox.has_value()) {
+            const auto boxToDelete = cachedBox.value();
+            Entry<DataType> target = { .box=boxToDelete, .data=data };
+            node = findContaining(target);
+            if (!node) {
+                return;
+            }
+            node->remove(target);
+        }
+        else {
+            const auto nodeIt = std::find_if(begin(), end(), [&data](auto& node) {
+                if (!node.isLeaf()) {
+                    return false;
+                }
+                return node.remove(data);
+            });
+            if (nodeIt == end()) {
+                return;
+            }
+            node = nodeIt.get();
+        }
+        condense(node);
+        if (_root->getChildren().size() == 1 && !_root->getChildren()[0]->isLeaf()) {
+            _root = _root->getChildren()[0];
+        }
+    }
+
+    template<typename DataType>
     void Tree<DataType>::insert(BoundingBox b, DataType data)
     {
+        saveToCache(data, b);
         Entry<DataType> e = { .box=b, .data=data };
         if (!_root) {
             _root = Node<DataType>::makeNode(e);
@@ -84,12 +139,36 @@ namespace rtree
             }
             else {
                 const auto& children = node->getChildren();
-                for (const auto& child: node->getChildren()) {
-                    stack.emplace(child);
+                for (const auto& child: children) {
+                    stack.emplace(child); // TODO: emplace only if children is intersected
                 }
             }
         }
         return intersected;
+    }
+
+    template<typename DataType>
+    void Tree<DataType>::condense(node_ptr<DataType> node)
+    {
+        std::vector<node_ptr<DataType>> removed;
+        auto current = node;
+        while (current != _root) {
+            const auto parent = current->getParent();
+            if (current->size() < DefaultMinEntries) {
+                parent->removeChild(current);
+                removed.push_back(current);
+            }
+            else {
+                current->updateBoundingBox();
+                break;
+            }
+            current = parent;
+        }
+        for (const auto& node: removed) {
+            for (const auto& entry: node->getEntries()) {
+                insert(entry.box, entry.data);
+            }
+        }
     }
 
     template<typename DataType>
@@ -117,5 +196,66 @@ namespace rtree
             node = bestChild;
         }
         return node;
+    }
+
+    template<typename DataType>
+    node_ptr<DataType> Tree<DataType>::findContaining(Entry<DataType> e) const
+    {
+        if (!_root->getBoundingBox().overlaps(e.box)) {
+            return nullptr;
+        }
+
+        if (_root->isLeaf()) {
+            return std::find(_root->getEntries().begin(), _root->getEntries().end(), e) != 
+                   _root->getEntries().end() ?
+                _root :
+                nullptr;
+        }
+
+        std::stack<node_ptr<DataType>> stack { { _root } };
+        while (!stack.empty()) {
+            const auto node = stack.top();
+            stack.pop();
+            if (!node->isLeaf()) {
+                const auto& children = node->getChildren();
+                for (auto it = children.begin(); it != children.end(); it++) {
+                    if ((*it)->getBoundingBox().overlaps(e.box)) {
+                        if ((*it)->isLeaf()) {
+                            if (std::find((*it)->getEntries().begin(), (*it)->getEntries().end(), e) !=
+                                (*it)->getEntries().end()) {
+                                return (*it);
+                            }
+                        }
+                        else {
+                            stack.emplace((*it));
+                        }
+                    }
+                }
+            }
+        }
+        return nullptr;
+    }
+
+
+    template<typename DataType>
+    std::optional<BoundingBox> Tree<DataType>::getFromCache(DataType data) const
+    {
+        const auto it = _cache.find(data);
+        if (it != _cache.end()) {
+            return it->second;
+        }
+        return {};
+    }
+
+    template<typename DataType>
+    void Tree<DataType>::removeFromCache(DataType data)
+    {
+        _cache.erase(data);
+    }
+
+    template<typename DataType>
+    void Tree<DataType>::saveToCache(DataType data, BoundingBox b)
+    {
+        _cache.insert(std::make_pair(data, b));
     }
 } // namespace rtree
