@@ -199,7 +199,8 @@ namespace rtree
         split_result ret = std::make_pair(makeNode(firstChildNodes.first), makeNode(firstChildNodes.second));
         ret.first->setParent(getParent());
         ret.second->setParent(getParent());
-        for (const auto& child: _children) { // TODO: shuffle
+        std::random_shuffle(std::begin(_children), std::end(_children));
+        for (const auto& child: _children) {
             if ((ret.first->getBoundingBox() & child->getBoundingBox()).area() <
                 (ret.second->getBoundingBox() & child->getBoundingBox()).area()) {
                 ret.first->insertChild(child);
@@ -235,7 +236,8 @@ namespace rtree
         split_result ret = std::make_pair(makeNode(firstEntries.first), makeNode(firstEntries.second));
         ret.first->setParent(getParent());
         ret.second->setParent(getParent());
-        for (const auto& entry: _entries) { // TODO: shuffle
+        std::random_shuffle(std::begin(_entries), std::end(_entries));
+        for (const auto& entry: _entries) {
             if ((ret.first->getBoundingBox() & entry.box).area() <
                 (ret.second->getBoundingBox() & entry.box).area()) {
                 ret.first->insert(entry);
