@@ -17,6 +17,7 @@ namespace rtree
     class Tree
     {
     public:
+        Tree() : minEntries(DefaultMinEntries), maxEntries(DefaultMaxEntries) {}
         void remove(DataType data);
         void insert(BoundingBox b, DataType data);
 
@@ -27,6 +28,9 @@ namespace rtree
 
         Iterator<DataType> begin() const { return Iterator<DataType>(_root); }
         Iterator<DataType> end() const { return Iterator<DataType>(); }
+
+        size_t getMinEntries() const { return minEntries; }
+        size_t getMaxEntries() const { return maxEntries; }
 
     private:
         void condense(node_ptr<DataType> node);
@@ -46,6 +50,8 @@ namespace rtree
 
         node_ptr<DataType> _root;
         std::map<DataType, BoundingBox> _cache;
+        size_t minEntries;
+        size_t maxEntries;
     };
 
 
