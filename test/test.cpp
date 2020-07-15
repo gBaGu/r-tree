@@ -21,13 +21,13 @@ BOOST_AUTO_TEST_CASE(insert)
         tree.insert(box, index);
         rootbox = box;
 
-        const auto& node = *tree.begin();
-        BOOST_CHECK(node.isLeaf());
-        BOOST_CHECK_EQUAL(node.size(), 1);
-        BOOST_CHECK_EQUAL(node.depth(), 0);
-        BOOST_CHECK_EQUAL(node.getParent(), nullptr);
-        BOOST_CHECK_MESSAGE(node.getBoundingBox() == rootbox, "Root node bounding box is incorrect");
-        BOOST_CHECK_EQUAL(std::next(tree.begin()), tree.end()); // check that only one node is present
+        auto nodeIt = tree.begin();
+        BOOST_CHECK(nodeIt->isLeaf());
+        BOOST_CHECK_EQUAL(nodeIt->size(), 1);
+        BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
+        BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
+        BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == rootbox, "Root node bounding box is incorrect");
+        BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end()); // check that only one node is present
     }
 
     {
@@ -36,13 +36,13 @@ BOOST_AUTO_TEST_CASE(insert)
         tree.insert(box, index);
         rootbox = rootbox & box;
 
-        const auto& node = *tree.begin();
-        BOOST_CHECK(node.isLeaf());
-        BOOST_CHECK_EQUAL(node.size(), 2);
-        BOOST_CHECK_EQUAL(node.depth(), 0);
-        BOOST_CHECK_EQUAL(node.getParent(), nullptr);
-        BOOST_CHECK_MESSAGE(node.getBoundingBox() == rootbox, "Root node bounding box is incorrect");
-        BOOST_CHECK_EQUAL(std::next(tree.begin()), tree.end()); // check that only one node is present
+        auto nodeIt = tree.begin();
+        BOOST_CHECK(nodeIt->isLeaf());
+        BOOST_CHECK_EQUAL(nodeIt->size(), 2);
+        BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
+        BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
+        BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == rootbox, "Root node bounding box is incorrect");
+        BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end()); // check that only one node is present
     }
 
     {
@@ -54,13 +54,13 @@ BOOST_AUTO_TEST_CASE(insert)
             rootbox = rootbox & box;
         }
 
-        const auto& node = *tree.begin();
-        BOOST_CHECK(node.isLeaf());
-        BOOST_CHECK_EQUAL(node.size(), tree.getMaxEntries()); // check that node is full
-        BOOST_CHECK_EQUAL(node.depth(), 0);
-        BOOST_CHECK_EQUAL(node.getParent(), nullptr);
-        BOOST_CHECK_MESSAGE(node.getBoundingBox() == rootbox, "Root node bounding box is incorrect");
-        BOOST_CHECK_EQUAL(std::next(tree.begin()), tree.end()); // check that only one node is present
+        auto nodeIt = tree.begin();
+        BOOST_CHECK(nodeIt->isLeaf());
+        BOOST_CHECK_EQUAL(nodeIt->size(), tree.getMaxEntries()); // check that node is full
+        BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
+        BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
+        BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == rootbox, "Root node bounding box is incorrect");
+        BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end()); // check that only one node is present
     }
 
     { // Insert to full root node
@@ -69,14 +69,31 @@ BOOST_AUTO_TEST_CASE(insert)
         tree.insert(box, index);
         rootbox = rootbox & box;
 
-        const auto& node = *tree.begin();
-        BOOST_CHECK(not node.isLeaf());
-        BOOST_CHECK_EQUAL(node.size(), 2);
-        BOOST_CHECK_EQUAL(node.depth(), 0);
-        BOOST_CHECK_EQUAL(node.getParent(), nullptr);
-        BOOST_CHECK_MESSAGE(node.getBoundingBox() == rootbox, "Root node bounding box is incorrect");
-        // TODO: check child nodes
+        auto nodeIt = tree.begin();
+        BOOST_CHECK(not nodeIt->isLeaf());
+        BOOST_CHECK_EQUAL(nodeIt->size(), 2);
+        BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
+        BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
+        BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == rootbox, "Root node bounding box is incorrect");
+
+        nodeIt = std::next(nodeIt);
+        const auto firstChildSize = nodeIt->size();
+        BOOST_CHECK(nodeIt->isLeaf());
+        BOOST_CHECK_EQUAL(nodeIt->depth(), 1);
+        BOOST_CHECK_EQUAL(nodeIt->getParent(), tree.begin().get());
+
+        nodeIt = std::next(nodeIt);
+        const auto secondChildSize = nodeIt->size();
+        BOOST_CHECK(nodeIt->isLeaf());
+        BOOST_CHECK_EQUAL(nodeIt->depth(), 1);
+        BOOST_CHECK_EQUAL(nodeIt->getParent(), tree.begin().get());
+
+        BOOST_CHECK_EQUAL(firstChildSize + secondChildSize, tree.getMaxEntries() + 1);
+        BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end());
     }
+
+    // TODO: insert two more enties to different nodes
+    //       and check that node to insert to is choosen correctly
 }
 
 BOOST_AUTO_TEST_SUITE_END()
