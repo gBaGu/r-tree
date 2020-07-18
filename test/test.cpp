@@ -8,6 +8,13 @@
 
 BOOST_AUTO_TEST_SUITE(Tree)
 
+BOOST_AUTO_TEST_CASE(creation)
+{
+    rtree::Tree<int> tree;
+    BOOST_REQUIRE_EQUAL(tree.getMaxEntries(), rtree::DefaultMaxEntries);
+    BOOST_REQUIRE_EQUAL(tree.getMinEntries(), rtree::DefaultMinEntries);
+}
+
 BOOST_AUTO_TEST_CASE(insert)
 {
     int indexCounter = 0;
