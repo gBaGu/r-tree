@@ -190,14 +190,19 @@ namespace rtree
                 throw std::logic_error("Node has no children. Tree is probably corrupted");
             }
             for (const auto child: children) {
-                const auto area = child->getBoundingBox().area();
+                const auto areaAfterInsert = (child->getBoundingBox() & b).area();
                 if (!bestChild) {
                     bestChild = child;
-                    minArea = area;
+                    minArea = areaAfterInsert;
                 }
-                else if (area < minArea) {
+                else if (areaAfterInsert < minArea) {
                     bestChild = child;
-                    minArea = area;
+                    minArea = areaAfterInsert;
+                }
+                else if (areaAfterInsert == minArea &&
+                         child->getBoundingBox().area() < bestChild->getBoundingBox().area()) {
+                    bestChild = child;
+                    minArea = areaAfterInsert;
                 }
             }
             node = bestChild;
