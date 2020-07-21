@@ -183,4 +183,35 @@ BOOST_AUTO_TEST_CASE(insert)
     }
 }
 
+BOOST_AUTO_TEST_CASE(remove_from_empty_tree)
+{
+    rtree::Tree<int> tree;
+    tree.remove(0);
+    BOOST_CHECK_EQUAL(tree.begin(), tree.end());
+}
+
+BOOST_AUTO_TEST_CASE(remove_the_only_entry)
+{
+    rtree::Tree<int> tree;
+    tree.insert({ .x=10, .y=10, .w=1, .h=1 }, 0);
+    tree.remove(0);
+    BOOST_CHECK_EQUAL(tree.begin(), tree.end());
+}
+
+BOOST_AUTO_TEST_CASE(remove_missing_entry)
+{
+    rtree::Tree<int> tree;
+    const auto box = rtree::BoundingBox{ .x=10, .y=10, .w=1, .h=1 };
+    tree.insert(box, 0);
+    tree.remove(1);
+    
+    auto nodeIt = tree.begin();
+    BOOST_CHECK(nodeIt->isLeaf());
+    BOOST_CHECK_EQUAL(nodeIt->size(), 1);
+    BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
+    BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
+    BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == box, "Root node bounding box is incorrect");
+    BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end()); // check that only one node is present
+}
+
 BOOST_AUTO_TEST_SUITE_END()
