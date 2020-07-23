@@ -13,14 +13,44 @@ BOOST_AUTO_TEST_CASE(creation)
     rtree::Tree<int> tree;
     BOOST_REQUIRE_EQUAL(tree.getMaxEntries(), rtree::DefaultMaxEntries);
     BOOST_REQUIRE_EQUAL(tree.getMinEntries(), rtree::DefaultMinEntries);
+    BOOST_CHECK_EQUAL(tree.begin(), tree.end());
+}
+
+BOOST_AUTO_TEST_CASE(insert_into_empty_tree)
+{
+    rtree::Tree<int> tree;
+    const rtree::BoundingBox box { .x=0, .y=0, .w=10, .h=10 };
+    tree.insert(box, 0);
+    auto nodeIt = tree.begin();
+    BOOST_CHECK(nodeIt->isLeaf());
+    BOOST_CHECK_EQUAL(nodeIt->size(), 1);
+    BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
+    BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
+    BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == box, "Root node bounding box is incorrect");
+    BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end()); // check that only one node is present
+}
+
+BOOST_AUTO_TEST_CASE(insert_into_nonempty_root)
+{
+    rtree::Tree<int> tree;
+    tree.insert({ .x=12, .y=34, .w=56, .h=78 }, 0);
+
+    // Insert into a tree with a single node and single entry
+    tree.insert({ .x=1, .y=2, .w=3, .h=4 }, 0);
+    const rtree::BoundingBox root{ .x=1, .y=2, .w=67, .h=110 };
+    auto nodeIt = tree.begin();
+    BOOST_CHECK(nodeIt->isLeaf());
+    BOOST_CHECK_EQUAL(nodeIt->size(), 2);
+    BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
+    BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
+    BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == root, "Root node bounding box is incorrect");
+    BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end()); // check that only one node is present
 }
 
 BOOST_AUTO_TEST_CASE(insert)
 {
     int indexCounter = 0;
     rtree::Tree<int> tree;
-    BOOST_CHECK_EQUAL(tree.begin(), tree.end());
-
     rtree::BoundingBox rootbox;
 
     { // Insert to empty tree
@@ -28,14 +58,6 @@ BOOST_AUTO_TEST_CASE(insert)
         const int index = indexCounter++;
         tree.insert(box, index);
         rootbox = box;
-
-        auto nodeIt = tree.begin();
-        BOOST_CHECK(nodeIt->isLeaf());
-        BOOST_CHECK_EQUAL(nodeIt->size(), 1);
-        BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
-        BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
-        BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == rootbox, "Root node bounding box is incorrect");
-        BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end()); // check that only one node is present
     }
 
     { // Insert into a tree with a single node and single entry
@@ -43,14 +65,6 @@ BOOST_AUTO_TEST_CASE(insert)
         const int index = indexCounter++;
         tree.insert(box, index);
         rootbox = rootbox & box;
-
-        auto nodeIt = tree.begin();
-        BOOST_CHECK(nodeIt->isLeaf());
-        BOOST_CHECK_EQUAL(nodeIt->size(), 2);
-        BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
-        BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
-        BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == rootbox, "Root node bounding box is incorrect");
-        BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end()); // check that only one node is present
     }
 
     { // Insert until root node is full
@@ -183,6 +197,13 @@ BOOST_AUTO_TEST_CASE(insert)
     }
 }
 
+BOOST_AUTO_TEST_CASE(insert_duplicate_id)
+{
+    rtree::Tree<int> tree;
+    tree.insert({ .x=10, .y=10, .w=1, .h=1 }, 0);
+    BOOST_CHECK_THROW(tree.insert({ .x=1, .y=10, .w=1, .h=1 }, 0), std::exception);
+}
+
 BOOST_AUTO_TEST_CASE(remove_from_empty_tree)
 {
     rtree::Tree<int> tree;
@@ -212,6 +233,119 @@ BOOST_AUTO_TEST_CASE(remove_missing_entry)
     BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
     BOOST_CHECK_MESSAGE(nodeIt->getBoundingBox() == box, "Root node bounding box is incorrect");
     BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end()); // check that only one node is present
+}
+
+BOOST_AUTO_TEST_CASE(remove_with_condense)
+{
+    int indexCounter = 0;
+    rtree::Tree<int> tree;
+
+    // Insert entries to fill up root node
+    for (size_t i = 0; i < tree.getMinEntries(); i++) {
+        const rtree::BoundingBox box { .x=5.0+i, .y=5.0+i, .w=5, .h=5 };
+        tree.insert(box, indexCounter++);
+    }
+    for (size_t i = 0; i < tree.getMaxEntries() - tree.getMinEntries(); i++) {
+        const rtree::BoundingBox box { .x=100.0+i, .y=100.0+i, .w=5, .h=5 };
+        tree.insert(box, indexCounter++);
+    }
+    // Insert one more to trigger split
+    tree.insert({ .x=100, .y=100, .w=1, .h=1 }, indexCounter++);
+
+    // Remove from node with minimum number of entries to trigger compaction
+    tree.remove(0);
+
+    const auto nodeIt = tree.begin();
+    BOOST_CHECK_EQUAL(nodeIt->size(), tree.getMaxEntries());
+    BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end());
+}
+
+BOOST_AUTO_TEST_CASE(remove_with_condense_followed_with_split)
+{
+    int indexCounter = 0;
+    rtree::Tree<int> tree;
+
+    // Insert entries to fill up root node
+    for (size_t i = 0; i < tree.getMinEntries(); i++) {
+        const rtree::BoundingBox box { .x=5.0+i, .y=5.0+i, .w=5, .h=5 };
+        tree.insert(box, indexCounter++);
+    }
+    for (size_t i = 0; i < tree.getMaxEntries() - tree.getMinEntries(); i++) {
+        const rtree::BoundingBox box { .x=100.0+i, .y=100.0+i, .w=5, .h=5 };
+        tree.insert(box, indexCounter++);
+    }
+    // Insert one more to trigger split
+    tree.insert({ .x=100, .y=100, .w=1, .h=1 }, indexCounter++);
+    // Insert one more to have total number of entries equal to tree.getMaxEntries() + 2
+    //  so everything won`t fit into one node after we remove one entry
+    tree.insert({ .x=101, .y=101, .w=1, .h=1 }, indexCounter++);
+
+    // Remove from node with minimum number of entries to trigger compaction and split
+    tree.remove(0);
+
+    auto nodeIt = tree.begin();
+    const auto root = nodeIt.get();
+    BOOST_CHECK(not nodeIt->isLeaf());
+    BOOST_CHECK_EQUAL(nodeIt->size(), 2);
+    BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
+    BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
+
+    nodeIt = std::next(nodeIt);
+    const auto firstChildSize = nodeIt->size();
+    BOOST_CHECK(nodeIt->isLeaf());
+    BOOST_CHECK_EQUAL(nodeIt->depth(), 1);
+    BOOST_CHECK_EQUAL(nodeIt->getParent(), root);
+
+    nodeIt = std::next(nodeIt);
+    const auto secondChildSize = nodeIt->size();
+    BOOST_CHECK(nodeIt->isLeaf());
+    BOOST_CHECK_EQUAL(nodeIt->depth(), 1);
+    BOOST_CHECK_EQUAL(nodeIt->getParent(), root);
+
+    BOOST_CHECK_EQUAL(firstChildSize + secondChildSize, tree.getMaxEntries() + 1);
+    BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end());
+}
+
+BOOST_AUTO_TEST_CASE(remove_without_condense)
+{
+    int indexCounter = 0;
+    rtree::Tree<int> tree;
+
+    // Insert entries to fill up root node
+    for (size_t i = 0; i < tree.getMinEntries(); i++) {
+        const rtree::BoundingBox box { .x=5.0+i, .y=5.0+i, .w=5, .h=5 };
+        tree.insert(box, indexCounter++);
+    }
+    for (size_t i = 0; i < tree.getMaxEntries() - tree.getMinEntries(); i++) {
+        const rtree::BoundingBox box { .x=100.0+i, .y=100.0+i, .w=5, .h=5 };
+        tree.insert(box, indexCounter++);
+    }
+    // Insert one more to trigger split
+    tree.insert({ .x=100, .y=100, .w=1, .h=1 }, indexCounter++);
+
+    tree.remove(indexCounter - 1);
+
+    auto nodeIt = tree.begin();
+    const auto root = nodeIt.get();
+    BOOST_CHECK(not nodeIt->isLeaf());
+    BOOST_CHECK_EQUAL(nodeIt->size(), 2);
+    BOOST_CHECK_EQUAL(nodeIt->depth(), 0);
+    BOOST_CHECK_EQUAL(nodeIt->getParent(), nullptr);
+
+    nodeIt = std::next(nodeIt);
+    const auto firstChildSize = nodeIt->size();
+    BOOST_CHECK(nodeIt->isLeaf());
+    BOOST_CHECK_EQUAL(nodeIt->depth(), 1);
+    BOOST_CHECK_EQUAL(nodeIt->getParent(), root);
+
+    nodeIt = std::next(nodeIt);
+    const auto secondChildSize = nodeIt->size();
+    BOOST_CHECK(nodeIt->isLeaf());
+    BOOST_CHECK_EQUAL(nodeIt->depth(), 1);
+    BOOST_CHECK_EQUAL(nodeIt->getParent(), root);
+
+    BOOST_CHECK_EQUAL(firstChildSize + secondChildSize, tree.getMaxEntries());
+    BOOST_CHECK_EQUAL(std::next(nodeIt), tree.end());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
