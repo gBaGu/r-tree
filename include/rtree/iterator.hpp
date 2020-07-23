@@ -33,7 +33,7 @@ namespace rtree
         Iterator operator++(int);
         reference operator*() { return *_stack.top(); }
         const reference operator*() const { return *_stack.top(); }
-        pointer operator->() { return _stack.top(); }
+        pointer operator->() const { return _stack.top(); }
         pointer get() const { return _stack.top(); }
 
 
