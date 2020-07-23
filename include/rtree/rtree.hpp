@@ -80,7 +80,7 @@ namespace rtree
             node = nodeIt.get();
         }
         condense(node);
-        if (!empty() && _root->getChildren().size() == 1 && !_root->getChildren()[0]->isLeaf()) {
+        if (!empty() && !_root->isLeaf() && _root->size() == 1) {
             _root = _root->getChildren()[0];
         }
     }
