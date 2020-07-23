@@ -21,6 +21,7 @@ namespace rtree
         void remove(DataType data);
         void insert(BoundingBox b, DataType data);
 
+        bool empty() const { return begin() == end(); }
         /**
          * Find all entries whose bounding boxes are intersected by b
          */
@@ -85,7 +86,7 @@ namespace rtree
             node = nodeIt.get();
         }
         condense(node);
-        if (_root->getChildren().size() == 1 && !_root->getChildren()[0]->isLeaf()) {
+        if (!empty() && !_root->isLeaf() && _root->size() == 1) {
             _root = _root->getChildren()[0];
         }
     }
@@ -175,6 +176,9 @@ namespace rtree
             for (const auto& entry: node->getEntries()) {
                 insert(entry.box, entry.data);
             }
+        }
+        if (_root->size() == 0) {
+            _root = nullptr;
         }
     }
 
