@@ -54,8 +54,8 @@ namespace rtree
         const auto scalarA = scalarMultiplication(segmentVector, vectorAtoPoint);
         const auto scalarB = scalarMultiplication(segmentVector, vectorBtoPoint);
 
-        if (scalarA < 0 && scalarB < 0 ||
-            scalarA > 0 && scalarB > 0) {
+        if ((scalarA < 0 && scalarB < 0) ||
+            (scalarA > 0 && scalarB > 0)) {
             if (std::abs(scalarA) < std::abs(scalarB)) {
                 return length(vectorAtoPoint);
             }

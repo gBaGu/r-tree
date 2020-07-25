@@ -69,13 +69,13 @@ namespace rtree
 
     template<typename DataType>
     Node<DataType>::Node(node_ptr<DataType> child)
-        : _children({ child }), _boundingBox(child->getBoundingBox())
+        : _boundingBox(child->getBoundingBox()), _children({ child })
     {
     }
 
     template<typename DataType>
     Node<DataType>::Node(Entry<DataType> entry)
-        : _entries({ entry }), _boundingBox(entry.box)
+        : _boundingBox(entry.box), _entries({ entry })
     {
     }
 
