@@ -51,6 +51,7 @@ namespace rtree
 
     private:
         void condense(node_ptr<DataType> node);
+        void insertIgnoreCache(BoundingBox b, DataType data);
         /**
          * Find node whose bounding box area will be increased as little as possible
          * after insertion of entry represented by b
@@ -111,37 +112,7 @@ namespace rtree
     void Tree<DataType>::insert(BoundingBox b, DataType data)
     {
         saveToCache(data, b);
-        Entry<DataType> e = { .box=b, .data=data };
-        if (!_root) {
-            _root = Node<DataType>::makeNode(e);
-            return;
-        }
-
-        auto nodeToInsert = findInsertCandidate(b);
-        nodeToInsert->insert(e);
-        auto node = nodeToInsert;
-        while (node->getEntries().size() > DefaultMaxEntries) {
-            auto parent = node->getParent();
-            const auto splitnodes = node->split();
-            if (splitnodes.first && splitnodes.second) {
-                if (parent) {
-                    parent->removeChild(node); // TODO: can optimize here by skipping updateBoundingBox() call
-                    parent->insertChild(splitnodes.first);
-                    parent->insertChild(splitnodes.second);
-                    splitnodes.first->setParent(parent);
-                    splitnodes.second->setParent(parent);
-                }
-                else { // node is a root
-                    auto newRoot = Node<DataType>::makeNode(splitnodes.first);
-                    newRoot->insertChild(splitnodes.second);
-                    splitnodes.first->setParent(newRoot);
-                    splitnodes.second->setParent(newRoot);
-                    _root = newRoot;
-                    break;
-                }
-            }
-            node = parent;
-        }
+        insertIgnoreCache(b, data);
     }
 
     template<typename DataType>
@@ -190,11 +161,47 @@ namespace rtree
         }
         for (const auto& node: removed) {
             for (const auto& entry: node->getEntries()) {
-                insert(entry.box, entry.data);
+                insertIgnoreCache(entry.box, entry.data);
             }
         }
         if (_root->size() == 0) {
             _root = nullptr;
+        }
+    }
+
+    template<typename DataType>
+    void Tree<DataType>::insertIgnoreCache(BoundingBox b, DataType data)
+    {
+        Entry<DataType> e = { .box=b, .data=data };
+        if (!_root) {
+            _root = Node<DataType>::makeNode(e);
+            return;
+        }
+
+        auto nodeToInsert = findInsertCandidate(b);
+        nodeToInsert->insert(e);
+        auto node = nodeToInsert;
+        while (node->getEntries().size() > DefaultMaxEntries) {
+            auto parent = node->getParent();
+            const auto splitnodes = node->split();
+            if (splitnodes.first && splitnodes.second) {
+                if (parent) {
+                    parent->removeChild(node); // TODO: can optimize here by skipping updateBoundingBox() call
+                    parent->insertChild(splitnodes.first);
+                    parent->insertChild(splitnodes.second);
+                    splitnodes.first->setParent(parent);
+                    splitnodes.second->setParent(parent);
+                }
+                else { // node is a root
+                    auto newRoot = Node<DataType>::makeNode(splitnodes.first);
+                    newRoot->insertChild(splitnodes.second);
+                    splitnodes.first->setParent(newRoot);
+                    splitnodes.second->setParent(newRoot);
+                    _root = newRoot;
+                    break;
+                }
+            }
+            node = parent;
         }
     }
 
