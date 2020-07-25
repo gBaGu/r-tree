@@ -40,7 +40,7 @@ BOOST_AUTO_TEST_CASE(insert_into_nonempty_root)
     tree.insert({ .x=12, .y=34, .w=56, .h=78 }, 0);
 
     // Insert into a tree with a single node and single entry
-    tree.insert({ .x=1, .y=2, .w=3, .h=4 }, 0);
+    tree.insert({ .x=1, .y=2, .w=3, .h=4 }, 1);
     const rtree::BoundingBox root{ .x=1, .y=2, .w=67, .h=110 };
     auto nodeIt = tree.begin();
     BOOST_CHECK(nodeIt->isLeaf());

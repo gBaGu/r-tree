@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "exception.h"
 #include "iterator.hpp"
 #include "node.hpp"
 #include "settings.h"
@@ -13,6 +14,21 @@
 
 namespace rtree
 {
+    template<typename T,
+             std::enable_if_t<std::is_integral<T>::value, int> = 0>
+    std::string toString(const T& v)
+    {
+        return std::to_string(v);
+    }
+
+    template<typename T,
+             std::enable_if_t<not std::is_integral<T>::value, int> = 0>
+    std::string toString(const T& v)
+    {
+        return v.toString();
+    }
+
+
     template<typename DataType>
     class Tree
     {
@@ -272,6 +288,9 @@ namespace rtree
     template<typename DataType>
     void Tree<DataType>::saveToCache(DataType data, BoundingBox b)
     {
-        _cache.insert(std::make_pair(data, b));
+        const auto inserted = _cache.insert(std::make_pair(data, b));
+        if (!inserted.second) {
+            throw DuplicateEntryException("saveToCache() error: entry " + toString(data) + " is already exists");
+        }
     }
 } // namespace rtree
