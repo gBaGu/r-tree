@@ -10,6 +10,7 @@
 #include "iterator.hpp"
 #include "node.hpp"
 #include "settings.h"
+#include "split.hpp"
 
 
 namespace rtree
@@ -29,11 +30,11 @@ namespace rtree
     }
 
 
-    template<typename DataType>
+    template<typename DataType, typename SplitStrategy = LinearSplit>
     class Tree
     {
     public:
-        Tree() : minEntries(DefaultMinEntries), maxEntries(DefaultMaxEntries) {}
+        Tree() : _splitStrategy(DefaultMinEntries, DefaultMaxEntries) {}
         void remove(DataType data);
         void insert(BoundingBox b, DataType data);
 
@@ -46,8 +47,8 @@ namespace rtree
         Iterator<DataType> begin() const { return Iterator<DataType>(_root); }
         Iterator<DataType> end() const { return Iterator<DataType>(); }
 
-        size_t getMinEntries() const { return minEntries; }
-        size_t getMaxEntries() const { return maxEntries; }
+        size_t getMinEntries() const { return _splitStrategy.getMinEntries(); }
+        size_t getMaxEntries() const { return _splitStrategy.getMaxEntries(); }
 
     private:
         void condense(node_ptr<DataType> node);
@@ -68,13 +69,12 @@ namespace rtree
 
         node_ptr<DataType> _root;
         std::map<DataType, BoundingBox> _cache;
-        size_t minEntries;
-        size_t maxEntries;
+        SplitStrategy _splitStrategy;
     };
 
 
-    template<typename DataType>
-    void Tree<DataType>::remove(DataType data)
+    template<typename DataType, typename SplitStrategy>
+    void Tree<DataType, SplitStrategy>::remove(DataType data)
     {
         const auto cachedBox = getFromCache(data);
         removeFromCache(data);
@@ -108,15 +108,15 @@ namespace rtree
         }
     }
 
-    template<typename DataType>
-    void Tree<DataType>::insert(BoundingBox b, DataType data)
+    template<typename DataType, typename SplitStrategy>
+    void Tree<DataType, SplitStrategy>::insert(BoundingBox b, DataType data)
     {
         saveToCache(data, b);
         insertIgnoreCache(b, data);
     }
 
-    template<typename DataType>
-    std::vector<Entry<DataType>> Tree<DataType>::find(BoundingBox b) const
+    template<typename DataType, typename SplitStrategy>
+    std::vector<Entry<DataType>> Tree<DataType, SplitStrategy>::find(BoundingBox b) const
     {
         std::vector<Entry<DataType>> intersected;
         std::stack<node_ptr<DataType>> stack { { _root } };
@@ -141,8 +141,8 @@ namespace rtree
         return intersected;
     }
 
-    template<typename DataType>
-    void Tree<DataType>::condense(node_ptr<DataType> node)
+    template<typename DataType, typename SplitStrategy>
+    void Tree<DataType, SplitStrategy>::condense(node_ptr<DataType> node)
     {
         std::vector<node_ptr<DataType>> removed;
         auto current = node;
@@ -169,8 +169,8 @@ namespace rtree
         }
     }
 
-    template<typename DataType>
-    void Tree<DataType>::insertIgnoreCache(BoundingBox b, DataType data)
+    template<typename DataType, typename SplitStrategy>
+    void Tree<DataType, SplitStrategy>::insertIgnoreCache(BoundingBox b, DataType data)
     {
         Entry<DataType> e = { .box=b, .data=data };
         if (!_root) {
@@ -181,9 +181,9 @@ namespace rtree
         auto nodeToInsert = findInsertCandidate(b);
         nodeToInsert->insert(e);
         auto node = nodeToInsert;
-        while (node->getEntries().size() > DefaultMaxEntries) {
+        while (_splitStrategy.needSplit(node)) {
             auto parent = node->getParent();
-            const auto splitnodes = node->split();
+            const auto splitnodes = _splitStrategy.split(node);
             if (splitnodes.first && splitnodes.second) {
                 if (parent) {
                     parent->removeChild(node); // TODO: can optimize here by skipping updateBoundingBox() call
@@ -205,8 +205,8 @@ namespace rtree
         }
     }
 
-    template<typename DataType>
-    node_ptr<DataType> Tree<DataType>::findInsertCandidate(BoundingBox b) const
+    template<typename DataType, typename SplitStrategy>
+    node_ptr<DataType> Tree<DataType, SplitStrategy>::findInsertCandidate(BoundingBox b) const
     {
         auto node = _root;
         while (node->getEntries().empty()) {
@@ -237,8 +237,8 @@ namespace rtree
         return node;
     }
 
-    template<typename DataType>
-    node_ptr<DataType> Tree<DataType>::findContaining(Entry<DataType> e) const
+    template<typename DataType, typename SplitStrategy>
+    node_ptr<DataType> Tree<DataType, SplitStrategy>::findContaining(Entry<DataType> e) const
     {
         if (!_root->getBoundingBox().overlaps(e.box)) {
             return nullptr;
@@ -276,8 +276,8 @@ namespace rtree
     }
 
 
-    template<typename DataType>
-    std::optional<BoundingBox> Tree<DataType>::getFromCache(DataType data) const
+    template<typename DataType, typename SplitStrategy>
+    std::optional<BoundingBox> Tree<DataType, SplitStrategy>::getFromCache(DataType data) const
     {
         const auto it = _cache.find(data);
         if (it != _cache.end()) {
@@ -286,14 +286,14 @@ namespace rtree
         return {};
     }
 
-    template<typename DataType>
-    void Tree<DataType>::removeFromCache(DataType data)
+    template<typename DataType, typename SplitStrategy>
+    void Tree<DataType, SplitStrategy>::removeFromCache(DataType data)
     {
         _cache.erase(data);
     }
 
-    template<typename DataType>
-    void Tree<DataType>::saveToCache(DataType data, BoundingBox b)
+    template<typename DataType, typename SplitStrategy>
+    void Tree<DataType, SplitStrategy>::saveToCache(DataType data, BoundingBox b)
     {
         const auto inserted = _cache.insert(std::make_pair(data, b));
         if (!inserted.second) {
