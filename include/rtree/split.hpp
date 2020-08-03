@@ -1,4 +1,7 @@
 #pragma once
+#include <iterator>
+#include <utility>
+
 #include "node.hpp"
 #include "settings.h"
 
@@ -17,6 +20,7 @@ namespace rtree {
 
     template<typename T>
     using split_result = std::pair<node_ptr<T>, node_ptr<T>>;
+
 
     class LinearSplit
     {
@@ -40,6 +44,24 @@ namespace rtree {
         size_t _minEntries;
         size_t _maxEntries;
 
+
+        template<typename T>
+        static decltype(std::declval<T>()->getBoundingBox().distance(std::declval<BoundingBox>())) distance(const T& l, const T& r)
+        {
+            return l->getBoundingBox().distance(r->getBoundingBox());
+        }
+
+        template<typename T>
+        static decltype(std::declval<T>().box.distance(std::declval<BoundingBox>())) distance(const T& l, const T& r)
+        {
+            return l.box.distance(r.box);
+        }
+
+        template<typename Iter>
+        std::pair<typename std::iterator_traits<Iter>::value_type,
+                  typename std::iterator_traits<Iter>::value_type>
+            pickSeeds(Iter begin, Iter end) const;
+
         template<typename T>
         split_result<T> splitInner(node_ptr<T> node) const;
 
@@ -47,6 +69,25 @@ namespace rtree {
         split_result<T> splitLeaf(node_ptr<T> node) const;
     };
 
+
+    template<typename Iter>
+    std::pair<typename std::iterator_traits<Iter>::value_type,
+              typename std::iterator_traits<Iter>::value_type>
+        LinearSplit::pickSeeds(Iter begin, Iter end) const
+    {
+        decltype(std::declval<LinearSplit>().pickSeeds(begin, end)) seeds;
+        double maxDistance = -1.0;
+        for (auto it1 = begin; it1 != end; it1++) {
+            for (auto it2 = std::next(it1); it2 != end; it2++) {
+                const auto dist = distance(*it1, *it2);
+                if (maxDistance == -1.0 || dist > maxDistance) {
+                    seeds = std::make_pair(*it1, *it2);
+                    maxDistance = dist;
+                }
+            }
+        }
+        return seeds;
+    }
 
     template<typename T>
     split_result<T> LinearSplit::split(node_ptr<T> node) const
@@ -66,28 +107,17 @@ namespace rtree {
     template<typename T>
     split_result<T> LinearSplit::splitInner(node_ptr<T> node) const
     {
-        // Choose two child nodes with the biggest distance
-        std::pair<node_ptr<T>, node_ptr<T>> firstChildNodes = std::make_pair(nullptr, nullptr);
-        double maxDistance = -1.0;
         const auto& children = node->getChildren();
-        for (auto it1 = children.begin(); it1 != children.end(); it1++) {
-            for (auto it2 = std::next(it1); it2 != children.end(); it2++) {
-                const auto d = (*it1)->getBoundingBox().distance((*it2)->getBoundingBox());
-                if (maxDistance == -1.0 || d > maxDistance) {
-                    firstChildNodes = std::make_pair(*it1, *it2);
-                    maxDistance = d;
-                }
-            }
-        }
+        const auto seeds = pickSeeds(children.begin(), children.end());
 
         std::vector<node_ptr<T>> otherChildren(children.size() - 2);
         std::remove_copy_if(children.begin(), children.end(),
                             otherChildren.begin(),
                             [&](const auto& child) {
-                                return child == firstChildNodes.first || child == firstChildNodes.second;
+                                return child == seeds.first || child == seeds.second;
                             });
 
-        auto ret = std::make_pair(Node<T>::makeNode(firstChildNodes.first), Node<T>::makeNode(firstChildNodes.second));
+        auto ret = std::make_pair(Node<T>::makeNode(seeds.first), Node<T>::makeNode(seeds.second));
         ret.first->setParent(node->getParent());
         ret.second->setParent(node->getParent());
         std::random_shuffle(std::begin(otherChildren), std::end(otherChildren));
@@ -106,27 +136,17 @@ namespace rtree {
     template<typename T>
     split_result<T> LinearSplit::splitLeaf(node_ptr<T> node) const
     {
-        std::pair<Entry<T>, Entry<T>> firstEntries;
-        double maxDistance = -1.0;
         const auto& entries = node->getEntries();
-        for (auto it1 = entries.begin(); it1 != entries.end(); it1++) {
-            for (auto it2 = std::next(it1); it2 != entries.end(); it2++) {
-                const auto d = it1->box.distance(it2->box);
-                if (maxDistance == -1.0 || d > maxDistance) {
-                    firstEntries = std::make_pair(*it1, *it2);
-                    maxDistance = d;
-                }
-            }
-        }
+        const auto seeds = pickSeeds(entries.begin(), entries.end());
 
         std::vector<Entry<T>> otherEntries(entries.size() - 2);
         std::remove_copy_if(entries.begin(), entries.end(),
                             otherEntries.begin(),
                             [&](const auto& entry) {
-                                return entry == firstEntries.first || entry == firstEntries.second;
+                                return entry == seeds.first || entry == seeds.second;
                             });
         
-        auto ret = std::make_pair(Node<T>::makeNode(firstEntries.first), Node<T>::makeNode(firstEntries.second));
+        auto ret = std::make_pair(Node<T>::makeNode(seeds.first), Node<T>::makeNode(seeds.second));
         ret.first->setParent(node->getParent());
         ret.second->setParent(node->getParent());
         std::random_shuffle(std::begin(otherEntries), std::end(otherEntries));
