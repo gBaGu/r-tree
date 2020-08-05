@@ -69,7 +69,7 @@ namespace rtree
 
         node_ptr<DataType> _root;
         std::map<DataType, BoundingBox> _cache;
-        SplitStrategy _splitStrategy;
+        Split<SplitStrategy> _splitStrategy;
     };
 
 
