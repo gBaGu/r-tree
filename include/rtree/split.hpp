@@ -183,4 +183,63 @@ namespace rtree {
             return l.box.distance(r.box);
         }
     };
+
+
+    class QuadraticSplit
+    {
+    public:
+        template <typename Iter>
+        static std::pair<typename std::iterator_traits<Iter>::value_type,
+                         typename std::iterator_traits<Iter>::value_type>
+            pickSeeds(Iter begin, Iter end)
+        {
+            decltype(std::declval<LinearSplit>().pickSeeds(begin, end)) seeds;
+            double maxDeadSpace = -1.0;
+            for (auto it1 = begin; it1 != end; it1++) {
+                for (auto it2 = std::next(it1); it2 != end; it2++) {
+                    const auto ds = deadSpace(*it1, *it2);
+                    if (maxDeadSpace == -1.0 || ds > maxDeadSpace) {
+                        seeds = std::make_pair(*it1, *it2);
+                        maxDeadSpace = ds;
+                    }
+                }
+            }
+            return seeds;
+        }
+
+        template <typename Bounded, typename T>
+        static std::enable_if_t<std::is_same_v<std::remove_cv_t<std::remove_reference_t<decltype(std::declval<Bounded>()->getBoundingBox())>>, BoundingBox>, void>
+            insertToBest(const Bounded& bounded, node_ptr<T> node1, node_ptr<T> node2)
+        {
+            // TODO: implement
+        }
+
+        template <typename Bounded, typename T>
+        static std::enable_if_t<std::is_same_v<decltype(std::declval<Bounded>().box), BoundingBox>, void>
+            insertToBest(const Bounded& bounded, node_ptr<T> node1, node_ptr<T> node2)
+        {
+            // TODO: implement
+        }
+
+    private:
+        template <typename Bounded>
+        static decltype(std::declval<Bounded>()->getBoundingBox().area())
+            deadSpace(const Bounded& l, const Bounded& r)
+        {
+            return (l->getBoundingBox() & r->getBoundingBox()).area() +
+                (l->getBoundingBox() | r->getBoundingBox()).area() -
+                l->getBoundingBox().area() -
+                r->getBoundingBox().area();
+        }
+
+        template <typename Bounded>
+        static decltype(std::declval<Bounded>().box.area())
+            deadSpace(const Bounded& l, const Bounded& r)
+        {
+            return (l.box & r.box).area() +
+                (l.box | r.box).area() -
+                l.box.area() -
+                r.box.area();
+        }
+    };
 } // namespace rtree
