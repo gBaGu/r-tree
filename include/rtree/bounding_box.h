@@ -71,17 +71,18 @@ namespace rtree
     }
 
 
-    struct BoundingBox
+    class BoundingBox
     {
-        double x;
-        double y;
-        double w;
-        double h;
+    public:
+        BoundingBox() : empty(true) {}
+        BoundingBox(double _x, double _y, double _w, double _h)
+            : x(_x), y(_y), w(_w), h(_h), empty(false) {}
 
         const Point bl() const { return Point{ .x=std::min(x, x+w), .y=std::min(y, y+h) }; }
         const Point tr() const { return Point{ .x=std::max(x, x+w), .y=std::max(y, y+h) }; }
 
-        double area() const { return h * w; } //TODO: rework to be able to work with negative width and height
+        bool isEmpty() const { return empty; }
+        double area() const { return empty ? 0.0 : h * w; } //TODO: rework to be able to work with negative width and height
         double distance(const BoundingBox& other) const;
         bool intersects(const BoundingBox& other) const;
         bool overlaps(const BoundingBox& other) const;
@@ -89,11 +90,20 @@ namespace rtree
         bool operator==(const BoundingBox& other) const;
         bool operator!=(const BoundingBox& other) const { return !(*this == other); }
         const BoundingBox operator&(const BoundingBox& other) const;
+        const BoundingBox operator|(const BoundingBox& other) const;
+
+        double x;
+        double y;
+        double w;
+        double h;
+
+    private:
+        bool empty;
     };
 
     double BoundingBox::distance(const BoundingBox& other) const
     {
-        if (this->intersects(other)) {
+        if (this->intersects(other) || isEmpty() || other.isEmpty()) {
             return 0.0;
         }
 
@@ -129,6 +139,9 @@ namespace rtree
 
     bool BoundingBox::intersects(const BoundingBox& other) const
     {
+        if (isEmpty() || other.isEmpty()) {
+            return false;
+        }
         const auto interLeft = std::max(bl().x, other.bl().x);
         const auto interRight = std::min(tr().x, other.tr().x);
         const auto interBottom = std::max(bl().y, other.bl().y);
@@ -139,21 +152,49 @@ namespace rtree
 
     bool BoundingBox::overlaps(const BoundingBox& other) const
     {
+        if (isEmpty() || other.isEmpty()) {
+            return false;
+        }
         return (*this & other) == *this; 
     }
 
     inline bool BoundingBox::operator==(const BoundingBox& other) const
     {
+        if (isEmpty() || other.isEmpty()) {
+            return false;
+        }
         return x == other.x && y == other.y && w == other.w && h == other.h;
     }
 
     inline const BoundingBox BoundingBox::operator&(const BoundingBox& other) const
     {
+        if (isEmpty()) {
+            return other;
+        }
+        else if (other.isEmpty()) {
+            return *this;
+        }
         //TODO: rework to be able to work with negative width and height
         const auto minX = std::min(x, other.x);
         const auto minY = std::min(y, other.y);
         const auto maxX = std::max(x + w, other.x + other.w);
         const auto maxY = std::max(y + h, other.y + other.h);
-        return BoundingBox{ .x=minX, .y=minY, .w=maxX-minX, .h=maxY-minY };
+        return BoundingBox(minX, minY, maxX-minX, maxY-minY);
+    }
+
+    inline const BoundingBox BoundingBox::operator|(const BoundingBox& other) const
+    {
+        if (isEmpty() || other.isEmpty()) {
+            return BoundingBox();
+        }
+
+        const auto interLeft = std::max(bl().x, other.bl().x);
+        const auto interRight = std::min(tr().x, other.tr().x);
+        const auto interBottom = std::max(bl().y, other.bl().y);
+        const auto interTop = std::min(tr().y, other.tr().y);
+        if (interLeft <= interRight && interBottom <= interTop) {
+            return BoundingBox(interLeft, interBottom, interRight - interLeft, interTop - interBottom);
+        }
+        return BoundingBox();
     }
 } // namespace rtree

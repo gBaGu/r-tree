@@ -13,7 +13,7 @@ int main()
         const double w = std::rand() % 100;
         const double h = std::rand() % 100;
         std::cout << i << ": " << x << ":" << y << ":" << w << ":" << h << std::endl;
-        tree.insert(rtree::BoundingBox{ .x=x, .y=y, .w=w, .h=h }, i);
+        tree.insert(rtree::BoundingBox(x, y, w, h), i);
     }
 
     std::cout << "Printing R-tree:\n";
@@ -30,7 +30,7 @@ int main()
         }
     });
 
-    auto intersected = tree.find(rtree::BoundingBox{ .x=9, .y=9, .w=2, .h=2 });
+    auto intersected = tree.find(rtree::BoundingBox(9, 9, 2, 2));
     std::cout << "Found intersected: " << std::endl;
     for (const auto& entry: intersected) {
         const auto box = entry.box;
@@ -40,7 +40,7 @@ int main()
 
     tree.remove(80);
 
-    intersected = tree.find(rtree::BoundingBox{ .x=9, .y=9, .w=2, .h=2 });
+    intersected = tree.find(rtree::BoundingBox(9, 9, 2, 2));
     std::cout << "Found intersected: " << std::endl;
     for (const auto& entry: intersected) {
         const auto box = entry.box;
