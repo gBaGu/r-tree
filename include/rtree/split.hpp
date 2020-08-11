@@ -132,38 +132,11 @@ namespace rtree {
     class QuadraticSplit
     {
     public:
-        template <typename Iter>
-        static std::pair<typename std::iterator_traits<Iter>::value_type,
-                         typename std::iterator_traits<Iter>::value_type>
-            pickSeeds(Iter begin, Iter end)
-        {
-            decltype(std::declval<LinearSplit>().pickSeeds(begin, end)) seeds;
-            double maxDeadSpace = -1.0;
-            for (auto it1 = begin; it1 != end; it1++) {
-                for (auto it2 = std::next(it1); it2 != end; it2++) {
-                    const auto ds = deadSpace(*it1, *it2);
-                    if (maxDeadSpace == -1.0 || ds > maxDeadSpace) {
-                        seeds = std::make_pair(*it1, *it2);
-                        maxDeadSpace = ds;
-                    }
-                }
-            }
-            return seeds;
-        }
+        template <typename T>
+        static split_result<T> splitInner(node_ptr<T> node);
 
-        template <typename Bounded, typename T>
-        static std::enable_if_t<std::is_same_v<std::remove_cv_t<std::remove_reference_t<decltype(std::declval<Bounded>()->getBoundingBox())>>, BoundingBox>, void>
-            insertToBest(const Bounded& bounded, node_ptr<T> node1, node_ptr<T> node2)
-        {
-            // TODO: implement
-        }
-
-        template <typename Bounded, typename T>
-        static std::enable_if_t<std::is_same_v<decltype(std::declval<Bounded>().box), BoundingBox>, void>
-            insertToBest(const Bounded& bounded, node_ptr<T> node1, node_ptr<T> node2)
-        {
-            // TODO: implement
-        }
+        template <typename T>
+        static split_result<T> splitLeaf(node_ptr<T> node);
 
     private:
         template <typename Bounded>
@@ -185,5 +158,115 @@ namespace rtree {
                 l.box.area() -
                 r.box.area();
         }
+
+        template <typename Iter>
+        static std::pair<typename std::iterator_traits<Iter>::value_type,
+                         typename std::iterator_traits<Iter>::value_type>
+            pickSeeds(Iter begin, Iter end)
+        {
+            decltype(std::declval<QuadraticSplit>().pickSeeds(begin, end)) seeds;
+            double maxDeadSpace = -1.0;
+            for (auto it1 = begin; it1 != end; it1++) {
+                for (auto it2 = std::next(it1); it2 != end; it2++) {
+                    const auto ds = deadSpace(*it1, *it2);
+                    if (maxDeadSpace == -1.0 || ds > maxDeadSpace) {
+                        seeds = std::make_pair(*it1, *it2);
+                        maxDeadSpace = ds;
+                    }
+                }
+            }
+            return seeds;
+        }
     };
+
+
+    template <typename T>
+    split_result<T> QuadraticSplit::splitInner(node_ptr<T> node)
+    {
+        const auto& children = node->getChildren();
+        const auto seeds = pickSeeds(children.begin(), children.end());
+
+        std::vector<node_ptr<T>> otherChildren(children.size() - 2);
+        std::remove_copy_if(children.begin(), children.end(),
+                            otherChildren.begin(),
+                            [&](const auto& child) {
+                                return child == seeds.first || child == seeds.second;
+                            });
+
+        auto ret = std::make_pair(Node<T>::makeNode(seeds.first), Node<T>::makeNode(seeds.second));
+        ret.first->setParent(node->getParent());
+        ret.second->setParent(node->getParent());
+        while (!otherChildren.empty()) {
+            double maxDeadSpaceDiff = -1.0;
+            size_t maxDeadSpaceId = -1;
+            for (size_t i = 0; i < otherChildren.size(); i++) {
+                const auto firstNodeDeadSpace = deadSpace(seeds.first, otherChildren[i]);
+                const auto secondNodeDeadSpace = deadSpace(seeds.second, otherChildren[i]);
+                const auto deadSpaceDiff = std::abs(firstNodeDeadSpace - secondNodeDeadSpace);
+                if (maxDeadSpaceDiff == -1.0 ||
+                    deadSpaceDiff > maxDeadSpaceDiff) {
+                    maxDeadSpaceId = i;
+                    maxDeadSpaceDiff = deadSpaceDiff;
+                }
+            }
+            const auto& entry = otherChildren[maxDeadSpaceId];
+            if ((ret.first->getBoundingBox() & entry->getBoundingBox()).area() <
+                (ret.second->getBoundingBox() & entry->getBoundingBox()).area()) {
+                ret.first->insertChild(entry);
+            }
+            else {
+                ret.second->insertChild(entry);
+            }
+            if (maxDeadSpaceId != otherChildren.size() - 1) {
+                std::swap(otherChildren[maxDeadSpaceId], otherChildren.back());
+            }
+            otherChildren.resize(otherChildren.size() - 1);
+        }
+        return ret;
+    }
+
+    template <typename T>
+    split_result<T> QuadraticSplit::splitLeaf(node_ptr<T> node)
+    {
+        const auto& entries = node->getEntries();
+        const auto seeds = pickSeeds(entries.begin(), entries.end());
+
+        std::vector<Entry<T>> otherEntries(entries.size() - 2);
+        std::remove_copy_if(entries.begin(), entries.end(),
+                            otherEntries.begin(),
+                            [&](const auto& entry) {
+                                return entry == seeds.first || entry == seeds.second;
+                            });
+        
+        auto ret = std::make_pair(Node<T>::makeNode(seeds.first), Node<T>::makeNode(seeds.second));
+        ret.first->setParent(node->getParent());
+        ret.second->setParent(node->getParent());
+        while (!otherEntries.empty()) {
+            double maxDeadSpaceDiff = -1.0;
+            size_t maxDeadSpaceId = -1;
+            for (size_t i = 0; i < otherEntries.size(); i++) {
+                const auto firstNodeDeadSpace = deadSpace(seeds.first, otherEntries[i]);
+                const auto secondNodeDeadSpace = deadSpace(seeds.second, otherEntries[i]);
+                const auto deadSpaceDiff = std::abs(firstNodeDeadSpace - secondNodeDeadSpace);
+                if (maxDeadSpaceDiff == -1.0 ||
+                    deadSpaceDiff > maxDeadSpaceDiff) {
+                    maxDeadSpaceId = i;
+                    maxDeadSpaceDiff = deadSpaceDiff;
+                }
+            }
+            const auto& entry = otherEntries[maxDeadSpaceId];
+            if ((ret.first->getBoundingBox() & entry.box).area() <
+                (ret.second->getBoundingBox() & entry.box).area()) {
+                ret.first->insert(entry);
+            }
+            else {
+                ret.second->insert(entry);
+            }
+            if (maxDeadSpaceId != otherEntries.size() - 1) {
+                std::swap(otherEntries[maxDeadSpaceId], otherEntries.back());
+            }
+            otherEntries.resize(otherEntries.size() - 1);
+        }
+        return ret;
+    }
 } // namespace rtree
