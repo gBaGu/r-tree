@@ -76,7 +76,7 @@ namespace rtree
     public:
         BoundingBox() : empty(true) {}
         BoundingBox(double _x, double _y, double _w, double _h)
-            : empty(false), x(_x), y(_y), w(_w), h(_h) {}
+            : x(_x), y(_y), w(_w), h(_h), empty(false) {}
 
         const Point bl() const { return Point{ .x=std::min(x, x+w), .y=std::min(y, y+h) }; }
         const Point tr() const { return Point{ .x=std::max(x, x+w), .y=std::max(y, y+h) }; }
