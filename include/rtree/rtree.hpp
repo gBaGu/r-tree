@@ -32,9 +32,9 @@ namespace rtree
 
     template<typename DataType, typename SplitStrategy = LinearSplit>
     class Tree
-    {
+    {    
     public:
-        Tree() : _splitStrategy(DefaultMinEntries, DefaultMaxEntries) {}
+        Tree() : _minEntries(DefaultMinEntries), _maxEntries(DefaultMaxEntries) {}
         void remove(DataType data);
         void insert(BoundingBox b, DataType data);
 
@@ -47,8 +47,8 @@ namespace rtree
         Iterator<DataType> begin() const { return Iterator<DataType>(_root); }
         Iterator<DataType> end() const { return Iterator<DataType>(); }
 
-        size_t getMinEntries() const { return _splitStrategy.getMinEntries(); }
-        size_t getMaxEntries() const { return _splitStrategy.getMaxEntries(); }
+        size_t getMinEntries() const { return _minEntries; }
+        size_t getMaxEntries() const { return _maxEntries; }
 
     private:
         void condense(node_ptr<DataType> node);
@@ -63,13 +63,21 @@ namespace rtree
         */
         node_ptr<DataType> findContaining(Entry<DataType> e) const;
 
+        bool needSplit(node_ptr<DataType> node) const
+        {
+            return node->size() > getMaxEntries();
+        }
+
+        split_result<DataType> split(node_ptr<DataType> node) const;
+
         std::optional<BoundingBox> getFromCache(DataType data) const;
         void removeFromCache(DataType data);
         void saveToCache(DataType data, BoundingBox b);
 
         node_ptr<DataType> _root;
         std::map<DataType, BoundingBox> _cache;
-        Split<SplitStrategy> _splitStrategy;
+        size_t _minEntries;
+        size_t _maxEntries;
     };
 
 
@@ -181,9 +189,9 @@ namespace rtree
         auto nodeToInsert = findInsertCandidate(b);
         nodeToInsert->insert(e);
         auto node = nodeToInsert;
-        while (_splitStrategy.needSplit(node)) {
+        while (needSplit(node)) {
             auto parent = node->getParent();
-            const auto splitnodes = _splitStrategy.split(node);
+            const auto splitnodes = split(node);
             if (splitnodes.first && splitnodes.second) {
                 if (parent) {
                     parent->removeChild(node); // TODO: can optimize here by skipping updateBoundingBox() call
@@ -273,6 +281,22 @@ namespace rtree
             }
         }
         return nullptr;
+    }
+
+
+    template<typename DataType, typename SplitStrategy>
+    split_result<DataType> Tree<DataType, SplitStrategy>::split(node_ptr<DataType> node) const
+    {
+        if (node->size() <= 1) {
+            return std::make_pair(nullptr, nullptr);
+        }
+
+        if (node->isLeaf()) {
+            return SplitStrategy::splitLeaf(node);
+        }
+        else { // not leaf
+            return SplitStrategy::splitInner(node);
+        }
     }
 
 
