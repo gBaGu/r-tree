@@ -30,12 +30,19 @@ namespace rtree
     {
         using split_result = std::pair<node_ptr<DataType>, node_ptr<DataType>>;
     public:
-        //TODO: create more constructors
+        Node() {}
         explicit Node(node_ptr<DataType> child); // TODO: rework because this can be thought of as a copy constructor
         explicit Node(Entry<DataType> entry);
 
+        static node_ptr<DataType> makeEmpty() { return std::make_shared<Node<DataType>>(); }
         static node_ptr<DataType> makeNode(node_ptr<DataType> child) { return std::make_shared<Node<DataType>>(child); }
         static node_ptr<DataType> makeNode(Entry<DataType> entry) { return std::make_shared<Node<DataType>>(entry); }
+
+        template <typename Iter>
+        static node_ptr<DataType> makeInner(Iter begin, Iter end);
+
+        template <typename Iter>
+        static node_ptr<DataType> makeLeaf(Iter begin, Iter end);
 
         void expandBoundingBox(BoundingBox b);
         void insert(const Entry<DataType>& e);
@@ -77,6 +84,24 @@ namespace rtree
     Node<DataType>::Node(Entry<DataType> entry)
         : _boundingBox(entry.box), _entries({ entry })
     {
+    }
+
+    template<typename DataType>
+    template <typename Iter>
+    node_ptr<DataType> Node<DataType>::makeInner(Iter begin, Iter end)
+    {
+        const auto node = Node<DataType>::makeEmpty();
+        std::for_each(begin, end, [&](const auto& child) { node->insertChild(child); });
+        return node;
+    }
+
+    template<typename DataType>
+    template <typename Iter>
+    node_ptr<DataType> Node<DataType>::makeLeaf(Iter begin, Iter end)
+    {
+        const auto node = Node<DataType>::makeEmpty();
+        std::for_each(begin, end, [&](const auto& entry) { node->insert(entry); });
+        return node;
     }
 
     template<typename DataType>
