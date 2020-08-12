@@ -23,7 +23,7 @@ BOOST_AUTO_TEST_CASE(creation)
 BOOST_AUTO_TEST_CASE(insert_into_empty_tree)
 {
     rtree::Tree<int> tree;
-    const rtree::BoundingBox box { .x=0, .y=0, .w=10, .h=10 };
+    const rtree::BoundingBox box(0, 0, 10, 10);
     tree.insert(box, 0);
     auto nodeIt = tree.begin();
     BOOST_CHECK(nodeIt->isLeaf());
@@ -37,11 +37,11 @@ BOOST_AUTO_TEST_CASE(insert_into_empty_tree)
 BOOST_AUTO_TEST_CASE(insert_into_nonempty_root)
 {
     rtree::Tree<int> tree;
-    tree.insert({ .x=12, .y=34, .w=56, .h=78 }, 0);
+    tree.insert({ 12, 34, 56, 78 }, 0);
 
     // Insert into a tree with a single node and single entry
-    tree.insert({ .x=1, .y=2, .w=3, .h=4 }, 1);
-    const rtree::BoundingBox root{ .x=1, .y=2, .w=67, .h=110 };
+    tree.insert({ 1, 2, 3, 4 }, 1);
+    const rtree::BoundingBox root(1, 2, 67, 110);
     auto nodeIt = tree.begin();
     BOOST_CHECK(nodeIt->isLeaf());
     BOOST_CHECK_EQUAL(nodeIt->size(), 2);
@@ -55,10 +55,10 @@ BOOST_AUTO_TEST_CASE(insert_max_entries_into_root)
 {
     rtree::Tree<int> tree;
     for (size_t i = 0; i < tree.getMaxEntries(); i++) {
-        const rtree::BoundingBox box { .x=i*10.0, .y=i*10.0, .w=10, .h=10 };
+        const rtree::BoundingBox box(i*10.0, i*10.0, 10, 10);
         tree.insert(box, i);
     }
-    const rtree::BoundingBox root{ .x=0, .y=0, .w=100, .h=100 };
+    const rtree::BoundingBox root(0, 0, 100, 100);
     auto nodeIt = tree.begin();
     BOOST_CHECK(nodeIt->isLeaf());
     BOOST_CHECK_EQUAL(nodeIt->size(), tree.getMaxEntries());
@@ -72,11 +72,11 @@ BOOST_AUTO_TEST_CASE(insert_into_root_and_split)
 {
     rtree::Tree<int> tree;
     for (size_t i = 0; i < tree.getMaxEntries() + 1; i++) {
-        const rtree::BoundingBox box { .x=i*0.1, .y=i*0.1, .w=0.2, .h=0.2 };
+        const rtree::BoundingBox box(i*0.1, i*0.1, 0.2, 0.2);
         tree.insert(box, i);
     }
 
-    const rtree::BoundingBox root{ .x=0, .y=0, .w=1.2, .h=1.2 };
+    const rtree::BoundingBox root(0, 0, 1.2, 1.2);
     // Check that root node is not a leaf now
     auto nodeIt = tree.begin();
     BOOST_CHECK(not nodeIt->isLeaf());
@@ -108,23 +108,23 @@ BOOST_AUTO_TEST_CASE(insert)
     int indexCounter = 0;
     rtree::Tree<int> tree;
     std::vector<rtree::BoundingBox> boxes {
-        { .x=0, .y=0, .w=10, .h=10 },
-        { .x=0, .y=0, .w=30, .h=68 },
-        { .x=0, .y=0, .w=10, .h=10 },
-        { .x=10, .y=10, .w=10, .h=10 },
-        { .x=20, .y=20, .w=10, .h=10 },
-        { .x=30, .y=30, .w=10, .h=10 },
-        { .x=40, .y=40, .w=10, .h=10 },
-        { .x=50, .y=50, .w=10, .h=10 },
-        { .x=60, .y=60, .w=10, .h=10 },
-        { .x=70, .y=70, .w=10, .h=10 },
-        { .x=3, .y=40, .w=71, .h=46 }
+        { 0, 0, 10, 10 },
+        { 0, 0, 30, 68 },
+        { 0, 0, 10, 10 },
+        { 10, 10, 10, 10 },
+        { 20, 20, 10, 10 },
+        { 30, 30, 10, 10 },
+        { 40, 40, 10, 10 },
+        { 50, 50, 10, 10 },
+        { 60, 60, 10, 10 },
+        { 70, 70, 10, 10 },
+        { 3, 40, 71, 46 }
     };
     for (const auto& box: boxes) {
         const int index = indexCounter++;
         tree.insert(box, index);
     }
-    rtree::BoundingBox rootbox = { .x=0, .y=0, .w=80, .h=86 };
+    rtree::BoundingBox rootbox(0, 0, 80, 86);
 
     {
         // Check that root node is not a leaf now
@@ -154,8 +154,8 @@ BOOST_AUTO_TEST_CASE(insert)
     }
 
     { // Insert two entries that are close to different nodes
-        const rtree::BoundingBox box1 { .x=1, .y=1, .w=10, .h=10 };
-        const rtree::BoundingBox box2 { .x=90, .y=90, .w=10, .h=10 };
+        const rtree::BoundingBox box1(1, 1, 10, 10);
+        const rtree::BoundingBox box2(90, 90, 10, 10);
         const int index1 = indexCounter++;
         tree.insert(box1, index1);
         rootbox = rootbox & box1;
@@ -199,13 +199,13 @@ BOOST_AUTO_TEST_CASE(insert)
     { // Fill up a node that is not a root
         const auto intactNodeSize = std::next(std::next(tree.begin()))->size();
         while (std::next(tree.begin())->size() < tree.getMaxEntries()) {
-            const rtree::BoundingBox box { .x=5, .y=5, .w=5, .h=5 };
+            const rtree::BoundingBox box(5, 5, 5, 5);
             const int index = indexCounter++;
             tree.insert(box, index);
             rootbox = rootbox & box;
         }
         // One more to perform split
-        const rtree::BoundingBox box { .x=2, .y=2, .w=2, .h=2 };
+        const rtree::BoundingBox box(2, 2, 2, 2);
         const int index = indexCounter++;
         tree.insert(box, index);
         rootbox = rootbox & box;
@@ -236,8 +236,8 @@ BOOST_AUTO_TEST_CASE(insert)
 BOOST_AUTO_TEST_CASE(insert_duplicate_id)
 {
     rtree::Tree<int> tree;
-    tree.insert({ .x=10, .y=10, .w=1, .h=1 }, 0);
-    BOOST_CHECK_THROW(tree.insert({ .x=1, .y=10, .w=1, .h=1 }, 0), std::exception);
+    tree.insert({ 10, 10, 1, 1 }, 0);
+    BOOST_CHECK_THROW(tree.insert({ 1, 10, 1, 1 }, 0), std::exception);
 }
 
 BOOST_AUTO_TEST_CASE(remove_from_empty_tree)
@@ -250,7 +250,7 @@ BOOST_AUTO_TEST_CASE(remove_from_empty_tree)
 BOOST_AUTO_TEST_CASE(remove_the_only_entry)
 {
     rtree::Tree<int> tree;
-    tree.insert({ .x=10, .y=10, .w=1, .h=1 }, 0);
+    tree.insert({ 10, 10, 1, 1 }, 0);
     tree.remove(0);
     BOOST_CHECK_EQUAL(tree.begin(), tree.end());
 }
@@ -258,7 +258,7 @@ BOOST_AUTO_TEST_CASE(remove_the_only_entry)
 BOOST_AUTO_TEST_CASE(remove_missing_entry)
 {
     rtree::Tree<int> tree;
-    const auto box = rtree::BoundingBox{ .x=10, .y=10, .w=1, .h=1 };
+    const auto box = rtree::BoundingBox(10, 10, 1, 1);
     tree.insert(box, 0);
     tree.remove(1);
     
@@ -278,15 +278,15 @@ BOOST_AUTO_TEST_CASE(remove_with_condense)
 
     // Insert entries to fill up root node
     for (size_t i = 0; i < tree.getMinEntries(); i++) {
-        const rtree::BoundingBox box { .x=5.0+i, .y=5.0+i, .w=5, .h=5 };
+        const rtree::BoundingBox box(5.0+i, 5.0+i, 5, 5);
         tree.insert(box, indexCounter++);
     }
     for (size_t i = 0; i < tree.getMaxEntries() - tree.getMinEntries(); i++) {
-        const rtree::BoundingBox box { .x=100.0+i, .y=100.0+i, .w=5, .h=5 };
+        const rtree::BoundingBox box(100.0+i, 100.0+i, 5, 5);
         tree.insert(box, indexCounter++);
     }
     // Insert one more to trigger split
-    tree.insert({ .x=100, .y=100, .w=1, .h=1 }, indexCounter++);
+    tree.insert({ 100, 100, 1, 1 }, indexCounter++);
 
     // Remove from node with minimum number of entries to trigger compaction
     tree.remove(0);
@@ -303,18 +303,18 @@ BOOST_AUTO_TEST_CASE(remove_with_condense_followed_with_split)
 
     // Insert entries to fill up root node
     for (size_t i = 0; i < tree.getMinEntries(); i++) {
-        const rtree::BoundingBox box { .x=5.0+i, .y=5.0+i, .w=5, .h=5 };
+        const rtree::BoundingBox box(5.0+i, 5.0+i, 5, 5);
         tree.insert(box, indexCounter++);
     }
     for (size_t i = 0; i < tree.getMaxEntries() - tree.getMinEntries(); i++) {
-        const rtree::BoundingBox box { .x=100.0+i, .y=100.0+i, .w=5, .h=5 };
+        const rtree::BoundingBox box(100.0+i, 100.0+i, 5, 5);
         tree.insert(box, indexCounter++);
     }
     // Insert one more to trigger split
-    tree.insert({ .x=100, .y=100, .w=1, .h=1 }, indexCounter++);
+    tree.insert({ 100, 100, 1, 1 }, indexCounter++);
     // Insert one more to have total number of entries equal to tree.getMaxEntries() + 2
     //  so everything won`t fit into one node after we remove one entry
-    tree.insert({ .x=101, .y=101, .w=1, .h=1 }, indexCounter++);
+    tree.insert({ 101, 101, 1, 1 }, indexCounter++);
 
     // Remove from node with minimum number of entries to trigger compaction and split
     tree.remove(0);
@@ -349,15 +349,15 @@ BOOST_AUTO_TEST_CASE(remove_without_condense)
 
     // Insert entries to fill up root node
     for (size_t i = 0; i < tree.getMinEntries(); i++) {
-        const rtree::BoundingBox box { .x=5.0+i, .y=5.0+i, .w=5, .h=5 };
+        const rtree::BoundingBox box(5.0+i, 5.0+i, 5, 5);
         tree.insert(box, indexCounter++);
     }
     for (size_t i = 0; i < tree.getMaxEntries() - tree.getMinEntries(); i++) {
-        const rtree::BoundingBox box { .x=100.0+i, .y=100.0+i, .w=5, .h=5 };
+        const rtree::BoundingBox box(100.0+i, 100.0+i, 5, 5);
         tree.insert(box, indexCounter++);
     }
     // Insert one more to trigger split
-    tree.insert({ .x=100, .y=100, .w=1, .h=1 }, indexCounter++);
+    tree.insert({ 100, 100, 1, 1 }, indexCounter++);
 
     tree.remove(indexCounter - 1);
 
