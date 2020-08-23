@@ -9,4 +9,5 @@ target_link_libraries(test
     ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
 )
 
-add_test(TreeTest test)
+enable_testing()
+add_test(NAME TreeTest COMMAND $<TARGET_FILE:test>)
