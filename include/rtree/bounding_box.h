@@ -19,7 +19,7 @@ namespace rtree
     using Segment = std::pair<Point, Point>;
 
     
-    bool isDividing(Segment s, Point p1, Point p2)
+    static bool isDividing(Segment s, Point p1, Point p2)
     {
         //this is z coordinate of a result of vector multiplication
         //of vector {s.first, s.second} and {s.second, p1}
@@ -31,22 +31,22 @@ namespace rtree
         return std::min(z1, z2) <= 0 && std::max(z1, z2) >= 0;
     }
 
-    bool isIntersected(Segment s1, Segment s2)
+    static bool isIntersected(Segment s1, Segment s2)
     {
         return isDividing(s1, s2.first, s2.second) && isDividing(s2, s1.first, s1.second);
     }
 
-    double length(Point v)
+    static double length(Point v)
     {
         return std::pow(v.x * v.x + v.y * v.y, 0.5);
     }
 
-    double scalarMultiplication(Point l, Point r)
+    static double scalarMultiplication(Point l, Point r)
     {
         return l.x * r.x + l.y * r.y;
     }
 
-    double distance(Point p, Segment s)
+    static double distance(Point p, Segment s)
     {
         const auto segmentVector = s.second - s.first;
         const auto vectorAtoPoint = p - s.first;
@@ -82,15 +82,107 @@ namespace rtree
         const Point tr() const { return Point{ .x=std::max(x, x+w), .y=std::max(y, y+h) }; }
 
         bool isEmpty() const { return empty; }
-        double area() const { return empty ? 0.0 : h * w; } //TODO: rework to be able to work with negative width and height
-        double distance(const BoundingBox& other) const;
-        bool intersects(const BoundingBox& other) const;
-        bool overlaps(const BoundingBox& other) const;
 
-        bool operator==(const BoundingBox& other) const;
+        double area() const { return empty ? 0.0 : h * w; } //TODO: rework to be able to work with negative width and height
+
+        double distance(const BoundingBox& other) const
+        {
+            if (this->intersects(other) || isEmpty() || other.isEmpty()) {
+                return 0.0;
+            }
+
+            const Point r1Center = { x + w / 2, y + h / 2 };
+            const Point r2Center = { other.x + other.w / 2, other.y + other.h / 2 };
+            const std::vector<Segment> r1Sides = {
+                { Point{ x, y },         Point{ x + w, y } },
+                { Point{ x + w, y },     Point{ x + w, y + h } },
+                { Point{ x + w, y + h }, Point{ x, y + h } },
+                { Point{ x, y + h },     Point{ x, y } }
+            };
+            const std::vector<Segment> r2Sides = {
+                { Point{ other.x, other.y },                     Point{ other.x + other.w, other.y } },
+                { Point{ other.x + other.w, other.y },           Point{ other.x + other.w, other.y + other.h } },
+                { Point{ other.x + other.w, other.y + other.h }, Point{ other.x, other.y + other.h } },
+                { Point{ other.x, other.y + other.h },           Point{ other.x, other.y } }
+            };
+
+            const Segment connectedCenters = { r1Center, r2Center };
+            const auto it1 = std::find_if(r1Sides.begin(), r1Sides.end(),
+                [&](const auto& side) { return isIntersected(side, connectedCenters); });
+            const auto it2 = std::find_if(r2Sides.begin(), r2Sides.end(),
+                [&](const auto& side) { return isIntersected(side, connectedCenters); });
+            if (it1 == r1Sides.end() || it2 == r2Sides.end()) {
+                throw std::runtime_error("Impossible!");
+            }
+
+            return std::min({ rtree::distance(it1->first, *it2),
+                            rtree::distance(it1->second, *it2),
+                            rtree::distance(it2->first, *it1),
+                            rtree::distance(it2->second, *it1) });
+        }
+
+        bool intersects(const BoundingBox& other) const
+        {
+            if (isEmpty() || other.isEmpty()) {
+                return false;
+            }
+            const auto interLeft = std::max(bl().x, other.bl().x);
+            const auto interRight = std::min(tr().x, other.tr().x);
+            const auto interBottom = std::max(bl().y, other.bl().y);
+            const auto interTop = std::min(tr().y, other.tr().y);
+            return interLeft <= interRight && 
+                interBottom <= interTop;
+        }
+
+        bool overlaps(const BoundingBox& other) const
+        {
+            if (isEmpty() || other.isEmpty()) {
+                return false;
+            }
+            return (*this & other) == *this; 
+        }
+
+        bool operator==(const BoundingBox& other) const
+        {
+            if (isEmpty() || other.isEmpty()) {
+                return false;
+            }
+            return x == other.x && y == other.y && w == other.w && h == other.h;
+        }
+
         bool operator!=(const BoundingBox& other) const { return !(*this == other); }
-        const BoundingBox operator&(const BoundingBox& other) const;
-        const BoundingBox operator|(const BoundingBox& other) const;
+
+        const BoundingBox operator&(const BoundingBox& other) const
+        {
+            if (isEmpty()) {
+                return other;
+            }
+            else if (other.isEmpty()) {
+                return *this;
+            }
+            //TODO: rework to be able to work with negative width and height
+            const auto minX = std::min(x, other.x);
+            const auto minY = std::min(y, other.y);
+            const auto maxX = std::max(x + w, other.x + other.w);
+            const auto maxY = std::max(y + h, other.y + other.h);
+            return BoundingBox(minX, minY, maxX-minX, maxY-minY);
+        }
+
+        const BoundingBox operator|(const BoundingBox& other) const
+        {
+            if (isEmpty() || other.isEmpty()) {
+                return BoundingBox();
+            }
+
+            const auto interLeft = std::max(bl().x, other.bl().x);
+            const auto interRight = std::min(tr().x, other.tr().x);
+            const auto interBottom = std::max(bl().y, other.bl().y);
+            const auto interTop = std::min(tr().y, other.tr().y);
+            if (interLeft <= interRight && interBottom <= interTop) {
+                return BoundingBox(interLeft, interBottom, interRight - interLeft, interTop - interBottom);
+            }
+            return BoundingBox();
+        }
 
         double x;
         double y;
@@ -100,101 +192,4 @@ namespace rtree
     private:
         bool empty;
     };
-
-    double BoundingBox::distance(const BoundingBox& other) const
-    {
-        if (this->intersects(other) || isEmpty() || other.isEmpty()) {
-            return 0.0;
-        }
-
-        const Point r1Center = { x + w / 2, y + h / 2 };
-        const Point r2Center = { other.x + other.w / 2, other.y + other.h / 2 };
-        const std::vector<Segment> r1Sides = {
-            { Point{ x, y },         Point{ x + w, y } },
-            { Point{ x + w, y },     Point{ x + w, y + h } },
-            { Point{ x + w, y + h }, Point{ x, y + h } },
-            { Point{ x, y + h },     Point{ x, y } }
-        };
-        const std::vector<Segment> r2Sides = {
-            { Point{ other.x, other.y },                     Point{ other.x + other.w, other.y } },
-            { Point{ other.x + other.w, other.y },           Point{ other.x + other.w, other.y + other.h } },
-            { Point{ other.x + other.w, other.y + other.h }, Point{ other.x, other.y + other.h } },
-            { Point{ other.x, other.y + other.h },           Point{ other.x, other.y } }
-        };
-
-        const Segment connectedCenters = { r1Center, r2Center };
-        const auto it1 = std::find_if(r1Sides.begin(), r1Sides.end(),
-            [&](const auto& side) { return isIntersected(side, connectedCenters); });
-        const auto it2 = std::find_if(r2Sides.begin(), r2Sides.end(),
-            [&](const auto& side) { return isIntersected(side, connectedCenters); });
-        if (it1 == r1Sides.end() || it2 == r2Sides.end()) {
-            throw std::runtime_error("Impossible!");
-        }
-
-        return std::min({ rtree::distance(it1->first, *it2),
-                          rtree::distance(it1->second, *it2),
-                          rtree::distance(it2->first, *it1),
-                          rtree::distance(it2->second, *it1) });
-    }
-
-    bool BoundingBox::intersects(const BoundingBox& other) const
-    {
-        if (isEmpty() || other.isEmpty()) {
-            return false;
-        }
-        const auto interLeft = std::max(bl().x, other.bl().x);
-        const auto interRight = std::min(tr().x, other.tr().x);
-        const auto interBottom = std::max(bl().y, other.bl().y);
-        const auto interTop = std::min(tr().y, other.tr().y);
-        return interLeft <= interRight && 
-            interBottom <= interTop;
-    }
-
-    bool BoundingBox::overlaps(const BoundingBox& other) const
-    {
-        if (isEmpty() || other.isEmpty()) {
-            return false;
-        }
-        return (*this & other) == *this; 
-    }
-
-    inline bool BoundingBox::operator==(const BoundingBox& other) const
-    {
-        if (isEmpty() || other.isEmpty()) {
-            return false;
-        }
-        return x == other.x && y == other.y && w == other.w && h == other.h;
-    }
-
-    inline const BoundingBox BoundingBox::operator&(const BoundingBox& other) const
-    {
-        if (isEmpty()) {
-            return other;
-        }
-        else if (other.isEmpty()) {
-            return *this;
-        }
-        //TODO: rework to be able to work with negative width and height
-        const auto minX = std::min(x, other.x);
-        const auto minY = std::min(y, other.y);
-        const auto maxX = std::max(x + w, other.x + other.w);
-        const auto maxY = std::max(y + h, other.y + other.h);
-        return BoundingBox(minX, minY, maxX-minX, maxY-minY);
-    }
-
-    inline const BoundingBox BoundingBox::operator|(const BoundingBox& other) const
-    {
-        if (isEmpty() || other.isEmpty()) {
-            return BoundingBox();
-        }
-
-        const auto interLeft = std::max(bl().x, other.bl().x);
-        const auto interRight = std::min(tr().x, other.tr().x);
-        const auto interBottom = std::max(bl().y, other.bl().y);
-        const auto interTop = std::min(tr().y, other.tr().y);
-        if (interLeft <= interRight && interBottom <= interTop) {
-            return BoundingBox(interLeft, interBottom, interRight - interLeft, interTop - interBottom);
-        }
-        return BoundingBox();
-    }
 } // namespace rtree
