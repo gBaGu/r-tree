@@ -14,7 +14,7 @@ BOOST_AUTO_TEST_SUITE(Tree)
 
 BOOST_AUTO_TEST_CASE(creation)
 {
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     BOOST_REQUIRE_EQUAL(tree.getMaxEntries(), rtree::DefaultMaxEntries);
     BOOST_REQUIRE_EQUAL(tree.getMinEntries(), rtree::DefaultMinEntries);
     BOOST_CHECK_EQUAL(tree.begin(), tree.end());
@@ -22,7 +22,7 @@ BOOST_AUTO_TEST_CASE(creation)
 
 BOOST_AUTO_TEST_CASE(insert_into_empty_tree)
 {
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     const rtree::BoundingBox box(0, 0, 10, 10);
     tree.insert(box, 0);
     auto nodeIt = tree.begin();
@@ -36,7 +36,7 @@ BOOST_AUTO_TEST_CASE(insert_into_empty_tree)
 
 BOOST_AUTO_TEST_CASE(insert_into_nonempty_root)
 {
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     tree.insert({ 12, 34, 56, 78 }, 0);
 
     // Insert into a tree with a single node and single entry
@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(insert_into_nonempty_root)
 
 BOOST_AUTO_TEST_CASE(insert_max_entries_into_root)
 {
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     for (size_t i = 0; i < tree.getMaxEntries(); i++) {
         const rtree::BoundingBox box(i*10.0, i*10.0, 10, 10);
         tree.insert(box, i);
@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE(insert_max_entries_into_root)
 
 BOOST_AUTO_TEST_CASE(insert_into_root_and_split)
 {
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     for (size_t i = 0; i < tree.getMaxEntries() + 1; i++) {
         const rtree::BoundingBox box(i*0.1, i*0.1, 0.2, 0.2);
         tree.insert(box, i);
@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(insert_into_root_and_split)
 BOOST_AUTO_TEST_CASE(insert)
 {
     int indexCounter = 0;
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     std::vector<rtree::BoundingBox> boxes {
         { 0, 0, 10, 10 },
         { 0, 0, 30, 68 },
@@ -235,21 +235,21 @@ BOOST_AUTO_TEST_CASE(insert)
 
 BOOST_AUTO_TEST_CASE(insert_duplicate_id)
 {
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     tree.insert({ 10, 10, 1, 1 }, 0);
     BOOST_CHECK_THROW(tree.insert({ 1, 10, 1, 1 }, 0), std::exception);
 }
 
 BOOST_AUTO_TEST_CASE(remove_from_empty_tree)
 {
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     tree.remove(0);
     BOOST_CHECK_EQUAL(tree.begin(), tree.end());
 }
 
 BOOST_AUTO_TEST_CASE(remove_the_only_entry)
 {
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     tree.insert({ 10, 10, 1, 1 }, 0);
     tree.remove(0);
     BOOST_CHECK_EQUAL(tree.begin(), tree.end());
@@ -257,7 +257,7 @@ BOOST_AUTO_TEST_CASE(remove_the_only_entry)
 
 BOOST_AUTO_TEST_CASE(remove_missing_entry)
 {
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
     const auto box = rtree::BoundingBox(10, 10, 1, 1);
     tree.insert(box, 0);
     tree.remove(1);
@@ -274,7 +274,7 @@ BOOST_AUTO_TEST_CASE(remove_missing_entry)
 BOOST_AUTO_TEST_CASE(remove_with_condense)
 {
     int indexCounter = 0;
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
 
     // Insert entries to fill up root node
     for (size_t i = 0; i < tree.getMinEntries(); i++) {
@@ -299,7 +299,7 @@ BOOST_AUTO_TEST_CASE(remove_with_condense)
 BOOST_AUTO_TEST_CASE(remove_with_condense_followed_with_split)
 {
     int indexCounter = 0;
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
 
     // Insert entries to fill up root node
     for (size_t i = 0; i < tree.getMinEntries(); i++) {
@@ -345,7 +345,7 @@ BOOST_AUTO_TEST_CASE(remove_with_condense_followed_with_split)
 BOOST_AUTO_TEST_CASE(remove_without_condense)
 {
     int indexCounter = 0;
-    rtree::Tree<int> tree;
+    rtree::Tree<int, rtree::LinearSplit> tree;
 
     // Insert entries to fill up root node
     for (size_t i = 0; i < tree.getMinEntries(); i++) {
