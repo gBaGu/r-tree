@@ -1,6 +1,11 @@
 find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
-add_executable(test test.cpp)
+add_executable(test
+    main.cpp
+    linear_split_tests.cpp
+    quadratic_split_tests.cpp
+    exponential_split_tests.cpp
+)
 
 target_include_directories(test PUBLIC
     "${PROJECT_SOURCE_DIR}/include"

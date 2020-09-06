@@ -1,6 +1,3 @@
-#define BOOST_TEST_MODULE rtree test
-#define BOOST_TEST_DYN_LINK
-
 #include <boost/test/unit_test.hpp>
 
 #include <rtree/rtree.hpp>
@@ -10,7 +7,7 @@
 #include <vector>
 
 
-BOOST_AUTO_TEST_SUITE(Tree)
+BOOST_AUTO_TEST_SUITE(linear_split)
 
 BOOST_AUTO_TEST_CASE(creation)
 {
