@@ -1,5 +1,8 @@
 #pragma once
+#include <algorithm>
+#include <iostream>
 #include <iterator>
+#include <numeric>
 #include <utility>
 
 #include "node.hpp"
@@ -268,5 +271,97 @@ namespace rtree {
             otherEntries.resize(otherEntries.size() - 1);
         }
         return ret;
+    }
+
+
+    // Warning: not recommended for use when _maxEntries > 4
+    class ExponentialSplit
+    {
+    public:
+        template <typename T>
+        static split_result<T> splitInner(node_ptr<T> node);
+
+        template <typename T>
+        static split_result<T> splitLeaf(node_ptr<T> node);
+
+    private:
+    };
+
+
+    template <typename T>
+    split_result<T> ExponentialSplit::splitInner(node_ptr<T> node)
+    {
+        const auto& children = node->getChildren();
+        std::vector<size_t> perm(children.size());
+        std::iota(perm.begin(), perm.end(), 0);
+        double minTotalArea = -1.0;
+        size_t bestSeparator = 0;
+        std::vector<size_t> bestPermutation;
+        do {
+            for (size_t separator = 1; separator < children.size(); separator++) {
+                BoundingBox firstbox;
+                BoundingBox secondbox;
+                std::for_each(perm.begin(), perm.begin() + separator,
+                    [&](auto val) { firstbox = firstbox & children[val]->getBoundingBox(); });
+                std::for_each(perm.begin() + separator, perm.end(),
+                    [&](auto val) { secondbox = secondbox & children[val]->getBoundingBox(); });
+                auto totalArea = firstbox.area() + secondbox.area();
+                if (minTotalArea == -1.0 ||
+                    totalArea < minTotalArea) {
+                    minTotalArea = totalArea;
+                    bestSeparator = separator;
+                    bestPermutation = perm;
+                }
+            }
+        } while (std::next_permutation(perm.begin(), perm.end()));
+        std::vector<node_ptr<T>> firstNodeChildren(bestSeparator);
+        std::vector<node_ptr<T>> secondNodeChildren(children.size() - bestSeparator);
+        std::transform(bestPermutation.begin(), bestPermutation.begin() + bestSeparator,
+                       firstNodeChildren.begin(),
+                       [&](const auto& val) { return children[val]; });
+        std::transform(bestPermutation.begin() + bestSeparator, bestPermutation.end(),
+                       secondNodeChildren.begin(),
+                       [&](const auto& val) { return children[val]; });
+        return std::make_pair(Node<T>::makeInner(firstNodeChildren.begin(), firstNodeChildren.end()),
+                              Node<T>::makeInner(secondNodeChildren.begin(), secondNodeChildren.end()));
+    }
+
+    template <typename T>
+    split_result<T> ExponentialSplit::splitLeaf(node_ptr<T> node)
+    {
+        const auto& entries = node->getEntries();
+        std::vector<size_t> perm(entries.size());
+        std::iota(perm.begin(), perm.end(), 0);
+        double minTotalArea = -1.0;
+        size_t bestSeparator = 0;
+        std::vector<size_t> bestPermutation;
+        do {
+            for (size_t separator = 1; separator < entries.size(); separator++) {
+                BoundingBox firstbox;
+                BoundingBox secondbox;
+                std::for_each(perm.begin(), perm.begin() + separator,
+                    [&](auto val) { firstbox = firstbox & entries[val].box; });
+                std::for_each(perm.begin() + separator, perm.end(),
+                    [&](auto val) { secondbox = secondbox & entries[val].box; });
+                auto totalArea = firstbox.area() + secondbox.area();
+                if (minTotalArea == -1.0 ||
+                    totalArea < minTotalArea) {
+                    minTotalArea = totalArea;
+                    bestSeparator = separator;
+                    bestPermutation = perm;
+                }
+            }
+            std::cout << "Next permutation" << perm.front() << perm.back() << std::endl;
+        } while (std::next_permutation(perm.begin(), perm.end()));
+        std::vector<Entry<T>> firstNodeEntries(bestSeparator);
+        std::vector<Entry<T>> secondNodeEntries(entries.size() - bestSeparator);
+        std::transform(bestPermutation.begin(), bestPermutation.begin() + bestSeparator,
+                       firstNodeEntries.begin(),
+                       [&](const auto& val) { return entries[val]; });
+        std::transform(bestPermutation.begin() + bestSeparator, bestPermutation.end(),
+                       secondNodeEntries.begin(),
+                       [&](const auto& val) { return entries[val]; });
+        return std::make_pair(Node<T>::makeLeaf(firstNodeEntries.begin(), firstNodeEntries.end()),
+                              Node<T>::makeLeaf(secondNodeEntries.begin(), secondNodeEntries.end()));
     }
 } // namespace rtree
