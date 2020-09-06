@@ -55,7 +55,7 @@ namespace rtree
 
     private:
         void condense(node_ptr<DataType> node);
-        void insertIgnoreCache(BoundingBox b, DataType data);
+        void insertIgnoreIndex(BoundingBox b, DataType data);
         /**
          * Find node whose bounding box area will be increased as little as possible
          * after insertion of entry represented by b
@@ -73,12 +73,12 @@ namespace rtree
 
         split_result<DataType> split(node_ptr<DataType> node) const;
 
-        std::optional<BoundingBox> getFromCache(DataType data) const;
-        void removeFromCache(DataType data);
-        void saveToCache(DataType data, BoundingBox b);
+        std::optional<BoundingBox> getFromIndex(DataType data) const;
+        void removeFromIndex(DataType data);
+        void saveToIndex(DataType data, BoundingBox b);
 
         node_ptr<DataType> _root;
-        std::map<DataType, BoundingBox> _cache;
+        std::map<DataType, BoundingBox> _indexedBoxes;
         size_t _minEntries;
         size_t _maxEntries;
     };
@@ -105,13 +105,13 @@ namespace rtree
     template<typename DataType, typename SplitStrategy>
     void Tree<DataType, SplitStrategy>::remove(DataType data)
     {
-        const auto cachedBox = getFromCache(data);
-        removeFromCache(data);
+        const auto indexedBox = getFromIndex(data);
+        removeFromIndex(data);
 
         // Find and remove entry by its id
         node_ptr<DataType> node = nullptr;
-        if (cachedBox.has_value()) {
-            const auto boxToDelete = cachedBox.value();
+        if (indexedBox.has_value()) {
+            const auto boxToDelete = indexedBox.value();
             Entry<DataType> target = { .box=boxToDelete, .data=data };
             node = findContaining(target);
             if (!node) {
@@ -140,8 +140,8 @@ namespace rtree
     template<typename DataType, typename SplitStrategy>
     void Tree<DataType, SplitStrategy>::insert(BoundingBox b, DataType data)
     {
-        saveToCache(data, b);
-        insertIgnoreCache(b, data);
+        saveToIndex(data, b);
+        insertIgnoreIndex(b, data);
     }
 
     template<typename DataType, typename SplitStrategy>
@@ -190,7 +190,7 @@ namespace rtree
         }
         for (const auto& node: removed) {
             for (const auto& entry: node->getEntries()) {
-                insertIgnoreCache(entry.box, entry.data);
+                insertIgnoreIndex(entry.box, entry.data);
             }
         }
         if (_root->size() == 0) {
@@ -199,7 +199,7 @@ namespace rtree
     }
 
     template<typename DataType, typename SplitStrategy>
-    void Tree<DataType, SplitStrategy>::insertIgnoreCache(BoundingBox b, DataType data)
+    void Tree<DataType, SplitStrategy>::insertIgnoreIndex(BoundingBox b, DataType data)
     {
         Entry<DataType> e = { .box=b, .data=data };
         if (!_root) {
@@ -322,27 +322,27 @@ namespace rtree
 
 
     template<typename DataType, typename SplitStrategy>
-    std::optional<BoundingBox> Tree<DataType, SplitStrategy>::getFromCache(DataType data) const
+    std::optional<BoundingBox> Tree<DataType, SplitStrategy>::getFromIndex(DataType data) const
     {
-        const auto it = _cache.find(data);
-        if (it != _cache.end()) {
+        const auto it = _indexedBoxes.find(data);
+        if (it != _indexedBoxes.end()) {
             return it->second;
         }
         return {};
     }
 
     template<typename DataType, typename SplitStrategy>
-    void Tree<DataType, SplitStrategy>::removeFromCache(DataType data)
+    void Tree<DataType, SplitStrategy>::removeFromIndex(DataType data)
     {
-        _cache.erase(data);
+        _indexedBoxes.erase(data);
     }
 
     template<typename DataType, typename SplitStrategy>
-    void Tree<DataType, SplitStrategy>::saveToCache(DataType data, BoundingBox b)
+    void Tree<DataType, SplitStrategy>::saveToIndex(DataType data, BoundingBox b)
     {
-        const auto inserted = _cache.insert(std::make_pair(data, b));
+        const auto inserted = _indexedBoxes.insert(std::make_pair(data, b));
         if (!inserted.second) {
-            throw DuplicateEntryException("saveToCache() error: entry " + toString(data) + " is already exists");
+            throw DuplicateEntryException("saveToIndex() error: entry " + toString(data) + " is already exists");
         }
     }
 } // namespace rtree
