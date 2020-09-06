@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <optional>
 #include <stack>
@@ -34,7 +35,9 @@ namespace rtree
     class Tree
     {    
     public:
-        Tree() : _minEntries(DefaultMinEntries), _maxEntries(DefaultMaxEntries) {}
+        Tree()
+            : _minEntries(DefaultMinEntries), _maxEntries(DefaultMaxEntries) {}
+        Tree(size_t minEntries, size_t maxEntries);
         void remove(DataType data);
         void insert(BoundingBox b, DataType data);
 
@@ -79,6 +82,24 @@ namespace rtree
         size_t _minEntries;
         size_t _maxEntries;
     };
+
+
+    template<typename DataType, typename SplitStrategy>
+    Tree<DataType, SplitStrategy>::Tree(size_t minEntries, size_t maxEntries)
+        : _minEntries(minEntries), _maxEntries(maxEntries)
+    {
+        if (_minEntries == 0) {
+            _minEntries = 1;
+        }
+        if (_minEntries * 2 > _maxEntries) {
+            if (_maxEntries > std::numeric_limits<decltype(_maxEntries)>::max() / 2) {
+                _minEntries = _maxEntries / 2;
+            }
+            else {
+                _maxEntries = _minEntries * 2;
+            }
+        }
+    }
 
 
     template<typename DataType, typename SplitStrategy>
