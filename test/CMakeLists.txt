@@ -2,6 +2,7 @@ find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 
 add_executable(test
     main.cpp
+    tree_operations_tests.cpp
     linear_split_tests.cpp
     quadratic_split_tests.cpp
     exponential_split_tests.cpp
