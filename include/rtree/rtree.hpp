@@ -33,7 +33,7 @@ namespace rtree
 
     template<typename DataType, typename SplitStrategy = LinearSplit>
     class Tree
-    {    
+    {
     public:
         Tree()
             : _minEntries(DefaultMinEntries), _maxEntries(DefaultMaxEntries) {}
@@ -140,6 +140,9 @@ namespace rtree
     template<typename DataType, typename SplitStrategy>
     void Tree<DataType, SplitStrategy>::insert(BoundingBox b, DataType data)
     {
+        if (b.isEmpty()) {
+            throw EmptyBoundingBoxException("insert() error: bounding box is empty");
+        }
         saveToIndex(data, b);
         insertIgnoreIndex(b, data);
     }

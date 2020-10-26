@@ -22,6 +22,7 @@ namespace rtree
         DataType data;
 
         bool operator==(const Entry& other) const { return box == other.box && data == other.data; }
+        bool operator!=(const Entry& other) const { return !this->operator==(other); }
     };
 
 

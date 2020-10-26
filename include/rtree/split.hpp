@@ -351,7 +351,6 @@ namespace rtree {
                     bestPermutation = perm;
                 }
             }
-            std::cout << "Next permutation" << perm.front() << perm.back() << std::endl;
         } while (std::next_permutation(perm.begin(), perm.end()));
         std::vector<Entry<T>> firstNodeEntries(bestSeparator);
         std::vector<Entry<T>> secondNodeEntries(entries.size() - bestSeparator);
